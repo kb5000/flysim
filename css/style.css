@@ -19,6 +19,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   background: #101a1e; color: #e1ffea; font: 12px monospace;
 }
 #aircraft-type { flex: 1; }
+.guide-link {
+  padding: 3px 7px; border: 1px solid rgba(110, 185, 255, 0.5);
+  background: #14263a; color: #b9dcff; text-decoration: none;
+  font: 10px monospace; white-space: nowrap;
+}
+.guide-link:hover { background: #1c3b5b; }
 #refresh-input {
   padding: 3px 7px; border: 1px solid rgba(150, 235, 180, 0.45);
   background: #183027; color: #d9ffe5; font: 11px monospace;

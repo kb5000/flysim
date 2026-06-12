@@ -13,6 +13,10 @@ python3 -m http.server 8000
 Any static file server works. Click or press a key to start; press **H** for the
 controls overlay.
 
+Open `guide.html` for the complete textbook-style implementation guide,
+including architecture, equations, build steps, tests, and a file-by-file
+reference.
+
 Use the **MODEL** selector to switch between the fixed-wing aircraft and a
 quadcopter. Both use the same controls; the quad interprets aileron, elevator,
 rudder and throttle as roll rate, pitch rate, yaw rate and collective thrust.

@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlySim 构建教材</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/guide.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">FlySim Engineering Notes</p>
+      <h1>从零构建浏览器飞行模拟器</h1>
+      <p class="lead">
+        一份面向代码阅读者的教材式指南：从固定时间步、四元数和 WebGL2，
+        一直讲到固定翼气动力、四轴控制、程序地形、Gamepad API、HUD 与回归测试。
+      </p>
+      <div class="hero-actions">
+        <a class="button primary" href="index.html">返回模拟器</a>
+        <a class="button" href="#outline">查看教学大纲</a>
+      </div>
+      <div class="stats">
+        <span><strong>37</strong> 个项目文件</span>
+        <span><strong>120 Hz</strong> 固定物理步长</span>
+        <span><strong>2</strong> 套飞行动力学</span>
+        <span><strong>0</strong> 运行时依赖</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="page">
+    <aside class="toc">
+      <a class="toc-title" href="#">FlySim 教材</a>
+      <nav>
+        <a href="#outline">0. 教学大纲</a>
+        <a href="#architecture">1. 系统架构</a>
+        <a href="#loop">2. 主循环</a>
+        <a href="#coordinates">3. 坐标与数学</a>
+        <a href="#webgl">4. WebGL 引擎</a>
+        <a href="#world">5. 世界生成</a>
+        <a href="#fixed-wing">6. 固定翼动力学</a>
+        <a href="#quad">7. 四轴动力学</a>
+        <a href="#input">8. 输入系统</a>
+        <a href="#render-ui">9. 机模、HUD 与声音</a>
+        <a href="#tests">10. 测试策略</a>
+        <a href="#file-atlas">11. 逐文件讲解</a>
+        <a href="#study-path">12. 推荐学习路线</a>
+      </nav>
+    </aside>
+
+    <main>
+      <section id="outline" class="chapter">
+        <p class="chapter-no">CHAPTER 0</p>
+        <h2>教学大纲</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>知道最终会做出什么，而不是一开始就被 3D 数学和空气动力学吓住。</li>
+            <li>准备一个可以运行 ES Modules 的本地开发环境。</li>
+            <li>理解本课程采用“每章都能运行”的增量开发方式。</li>
+          </ul>
+        </div>
+        <div class="lesson-box prereq">
+          <h3>开始前需要会什么</h3>
+          <p>
+            你只需要理解 JavaScript 的变量、函数、数组、对象、类和
+            <code>import/export</code>。不要求学过 WebGL、矩阵、微积分或空气动力学；
+            遇到这些概念时，本教程会先解释直觉，再给公式和代码。
+          </p>
+        </div>
+        <h3>先把项目运行起来</h3>
+        <ol class="step-list">
+          <li>
+            <h4>启动静态服务器</h4>
+            <p>在项目根目录执行：</p>
+            <pre><code>python -m http.server 8000</code></pre>
+            <div class="why">浏览器出于安全原因，不允许从 <code>file://</code> 页面自由加载 ES Module。HTTP 服务器还能让 Gamepad、音频和模块错误更接近真实部署环境。</div>
+          </li>
+          <li>
+            <h4>打开模拟器与教材</h4>
+            <pre><code>http://localhost:8000/
+http://localhost:8000/guide.html</code></pre>
+            <div class="expected">模拟器应显示天空、跑道、地形和 HUD；教材页应显示左侧章节目录。</div>
+          </li>
+          <li>
+            <h4>打开开发者工具</h4>
+            <p>
+              在 Chrome 或 Edge 中按 F12，固定保留 Console 与 Network 面板。
+              从这一刻开始，每完成一步都先看控制台是否有红色错误。
+            </p>
+          </li>
+        </ol>
+        <div class="lesson-box checkpoint">
+          <h3>学习方法</h3>
+          <p>
+            不要一次复制完整项目。每章都建议新建一个临时分支，先实现最小版本，
+            运行并观察，再与当前源码比较。飞行模拟器是多个小系统的组合；
+            如果跳过中间检查，最后看到的通常只是一块黑屏或一架无法控制的飞机。
+          </p>
+        </div>
+        <p>
+          本教程不按文件名字母顺序阅读，而按依赖关系展开。先理解每一帧如何推进，
+          再学习数学与渲染基础，最后进入飞行动力学和设备输入。这样每个公式都能落到代码用途上。
+        </p>
+        <div class="outline-grid">
+          <article><b>第一阶段：骨架</b><span>HTML 入口、模块装配、固定步长与渲染插值。</span></article>
+          <article><b>第二阶段：数学</b><span>向量、四元数、矩阵、坐标系与刚体积分。</span></article>
+          <article><b>第三阶段：画面</b><span>WebGL 状态、着色器、网格、相机、天空与地形。</span></article>
+          <article><b>第四阶段：物理</b><span>气动力、力矩、发动机、起落架与六自由度方程。</span></article>
+          <article><b>第五阶段：四轴</b><span>总推力、角速度目标、闭环控制与地面约束。</span></article>
+          <article><b>第六阶段：交互</b><span>键盘、手柄枚举、死区、动作队列、HUD 与声音。</span></article>
+          <article><b>第七阶段：验证</b><span>把“手感正确”变成可重复的数值验收条件。</span></article>
+          <article><b>第八阶段：全文件复盘</b><span>逐个解释当前 37 个源码、测试、样式和文档文件。</span></article>
+        </div>
+        <div class="callout">
+          <strong>阅读目标</strong>
+          <p>读完后，你应当能独立增加一种飞行器、一个世界对象、一种输入设备或一项物理验收测试。</p>
+        </div>
+      </section>
+
+      <section id="architecture" class="chapter">
+        <p class="chapter-no">CHAPTER 1</p>
+        <h2>系统架构：数据如何穿过项目</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>画出 FlySim 的数据流图。</li>
+            <li>理解“状态”和“控制命令”为什么必须分开。</li>
+            <li>亲手搭出一个不含任何飞行公式的项目骨架。</li>
+          </ul>
+        </div>
+        <h3>第一步：只创建页面骨架</h3>
+        <p>
+          初学者最常见的错误，是一开始就写物理。正确顺序是先建立可以装配模块的容器。
+          在最小版本的 <code>index.html</code> 中放两个 Canvas：
+        </p>
+        <pre><code>&lt;div id="app"&gt;
+  &lt;canvas id="gl"&gt;&lt;/canvas&gt;
+  &lt;canvas id="hud"&gt;&lt;/canvas&gt;
+&lt;/div&gt;
+&lt;script type="module" src="src/main.js"&gt;&lt;/script&gt;</code></pre>
+        <p>
+          <code>gl</code> 负责 3D，<code>hud</code> 负责文字和仪表。分成两个画布不是必须，
+          但会极大简化字体、线条、裁剪和界面布局。
+        </p>
+        <div class="why">WebGL 很擅长大量三角形，却不擅长直接画清晰文字；Canvas 2D 很擅长仪表，却不适合成千上万的 3D 顶点。让工具各做擅长的事。</div>
+        <h3>第二步：定义两类数据</h3>
+        <pre><code>const state = {
+  pos: [0, 0, 0],
+  vel: [0, 0, 0],
+  q: [0, 0, 0, 1],
+  omega: [0, 0, 0],
+};
+
+const ctrl = {
+  aileron: 0,
+  elevator: 0,
+  rudder: 0,
+  throttle: 0,
+};</code></pre>
+        <p>
+          <code>state</code> 回答“飞机现在是什么状态”，它由物理系统写入；
+          <code>ctrl</code> 回答“驾驶员希望飞机做什么”，它由输入系统写入。
+          渲染系统只能读取二者，不应偷偷修改它们。
+        </p>
+        <div class="lesson-box warning">
+          <h3>常见错误：在键盘事件里直接移动飞机</h3>
+          <p>
+            例如按 W 就执行 <code>state.pos[1] += 1</code>。这样速度依赖键盘重复率，
+            物理无法计算惯性，手柄也要重写一套逻辑。输入应该只改变 <code>ctrl</code>，
+            位置只能由模拟器积分得到。
+          </p>
+        </div>
+        <h3>第三步：用接口而不是具体设备连接系统</h3>
+        <p>
+          键盘和手柄都输出同样的对象，固定翼和四轴都读取同样的对象。
+          因此添加设备或机型时，变化局限在一侧。
+        </p>
+        <pre><code>const input = selectedDevice.sample(dt);
+applyControls(ctrl, input);
+
+if (state.aircraftType === 'quad') {
+  stepQuad(state, ctrl, fixedDt);
+} else {
+  stepPhysics(state, ctrl, fixedDt);
+}</code></pre>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>
+            新增一个虚拟“自动驾驶输入”，让它始终返回
+            <code>{aileron:0,elevator:0,rudder:0,throttleDelta:0}</code>。
+            如果无需修改物理模块就能选择它，说明分层正确。
+          </p>
+        </div>
+        <p>
+          FlySim 的核心设计是“统一控制量 + 可切换模拟器 + 共享渲染状态”。
+          键盘和手柄最终都产生同一种 <code>ctrl</code>，固定翼和四轴各自解释它，
+          然后把位置、姿态和遥测写回 <code>state</code>。
+        </p>
+        <div class="flow">
+          <span>Keyboard / Gamepad</span><i>→</i><span>统一 ctrl</span><i>→</i>
+          <span>Fixed-wing / Quad physics</span><i>→</i><span>state</span><i>→</i>
+          <span>Scene + Camera + HUD + Audio</span>
+        </div>
+        <h3>分层原则</h3>
+        <table>
+          <thead><tr><th>目录</th><th>职责</th><th>不应负责</th></tr></thead>
+          <tbody>
+            <tr><td><code>src/sim</code></td><td>状态、力、力矩、积分、接地</td><td>DOM、WebGL、按键编号</td></tr>
+            <tr><td><code>src/input</code></td><td>设备读取并输出统一控制量</td><td>直接修改飞机位置</td></tr>
+            <tr><td><code>src/engine</code></td><td>通用数学与 WebGL 基础设施</td><td>知道 C172 参数</td></tr>
+            <tr><td><code>src/world</code></td><td>地形、跑道、天空</td><td>决定油门或舵面</td></tr>
+            <tr><td><code>src/render</code></td><td>场景和程序机模</td><td>计算真实气动力</td></tr>
+            <tr><td><code>src/ui</code></td><td>HUD、地图、音频反馈</td><td>成为物理状态真源</td></tr>
+          </tbody>
+        </table>
+        <h3>为什么统一控制量很重要</h3>
+        <p>
+          <code>aileron</code>、<code>elevator</code>、<code>rudder</code> 和
+          <code>throttle</code> 是项目内部协议。固定翼把前三者解释为舵面指令；
+          四轴把它们解释为滚转、俯仰、偏航角速度目标。输入层无需知道当前飞行器类型，
+          因而切换机型不会复制设备代码。
+        </p>
+      </section>
+
+      <section id="loop" class="chapter">
+        <p class="chapter-no">CHAPTER 2</p>
+        <h2>主循环：为什么物理不能直接使用帧间隔</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>先写出一个最小动画循环。</li>
+            <li>亲眼看到可变步长带来的不稳定，再改成固定步长。</li>
+            <li>实现位置线性插值与姿态球面插值。</li>
+          </ul>
+        </div>
+        <h3>从最小动画循环开始</h3>
+        <pre><code>let last = performance.now() / 1000;
+
+function frame(nowMs) {
+  const now = nowMs / 1000;
+  const dt = now - last;
+  last = now;
+
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);</code></pre>
+        <p>
+          这段代码适合动画，却不适合刚体物理。浏览器卡顿时 <code>dt</code> 可能从
+          0.016 秒跳到 0.2 秒。欧拉积分会一步跨过地面，弹簧力也可能大到让飞机爆飞。
+        </p>
+        <h3>做一个能看见问题的小实验</h3>
+        <pre><code>velocity += gravity * dt;
+height += velocity * dt;</code></pre>
+        <p>
+          在开发者工具中开启 CPU throttling。你会发现同一个物体落地时间和穿透程度改变。
+          这说明“显示帧率”不应该决定“物理时间离散方式”。
+        </p>
+        <h3>一步步加入累加器</h3>
+        <ol class="step-list">
+          <li>
+            <h4>选择固定步长</h4>
+            <p><code>const FIXED_DT = 1 / 120;</code>。120 Hz 对快速角运动和起落架弹簧更稳定。</p>
+          </li>
+          <li>
+            <h4>保存尚未模拟的时间</h4>
+            <p>每帧执行 <code>acc += dt</code>，不要立即把全部时间塞进一次物理更新。</p>
+          </li>
+          <li>
+            <h4>按固定小步消耗时间</h4>
+            <pre><code>while (acc &gt;= FIXED_DT) {
+  previous = snapshot(state);
+  step(state, ctrl, FIXED_DT);
+  acc -= FIXED_DT;
+}</code></pre>
+          </li>
+          <li>
+            <h4>插值显示状态</h4>
+            <p>物理可能落后渲染不足一个步长。用 <code>alpha=acc/FIXED_DT</code> 在前后状态间插值。</p>
+          </li>
+        </ol>
+        <div class="why">物理使用固定步长是为了稳定和可重复；渲染插值是为了不让固定步长在高刷新率屏幕上显得抖动。这两个目标不能混为一谈。</div>
+        <h3>防止“死亡螺旋”</h3>
+        <p>
+          如果一帧很慢，物理要补很多步；补步又让下一帧更慢。项目把帧间隔限制为 0.25 秒，
+          每帧最多执行 8 步。代价是严重卡顿时模拟时间会稍慢，但页面不会永久冻结。
+        </p>
+        <div class="expected">切换到 60 Hz、120 Hz 显示器或短暂拖动窗口时，飞机轨迹应基本相同，画面仍平滑。</div>
+        <p>
+          浏览器的 <code>requestAnimationFrame</code> 可能以 60、120 或不稳定帧率运行。
+          若直接用每帧 <code>dt</code> 积分，物理结果会随显示器和卡顿变化。
+          因此 <code>src/main.js</code> 使用累加器执行固定的 <code>1/120 s</code> 物理步。
+        </p>
+        <div class="formula">
+          <b>固定步长累加器</b>
+          <span>A ← A + Δt<sub>frame</sub></span>
+          <span>当 A ≥ h 时：执行 physics(h)，然后 A ← A − h</span>
+          <span>渲染插值系数：α = A / h</span>
+        </div>
+        <p>
+          这里的 <em>h</em> 是固定物理步长。每次物理更新前保存旧姿态，
+          渲染时用 <code>lerp</code> 插值位置、用 <code>slerp</code> 插值四元数。
+          这样物理保持确定性，画面仍然平滑。
+        </p>
+        <pre><code>while (acc &gt;= FIXED_DT) {
+  prevState = snapshot(state);
+  stepPhysics(state, ctrl, FIXED_DT);
+  acc -= FIXED_DT;
+}
+render(interpolate(prevState, state, acc / FIXED_DT));</code></pre>
+        <h3>每帧的完整顺序</h3>
+        <ol>
+          <li>计算并限制帧间隔，避免切回标签页后一次推进过远。</li>
+          <li>读取当前选中的输入设备，累积油门与配平。</li>
+          <li>消费按键边沿动作，例如襟翼、暂停、视角和重置。</li>
+          <li>按当前机型调用固定翼或四轴物理。</li>
+          <li>插值位置和姿态，推进螺旋桨视觉角度。</li>
+          <li>更新相机，绘制 3D 场景、HUD，再更新声音参数。</li>
+        </ol>
+      </section>
+
+      <section id="coordinates" class="chapter">
+        <p class="chapter-no">CHAPTER 3</p>
+        <h2>坐标系与数学基础</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>不用死记公式，也能判断一个向量属于世界系还是机体系。</li>
+            <li>实现最小 <code>vec3</code> 工具并理解点积、叉积。</li>
+            <li>理解四元数在项目中解决的具体问题。</li>
+          </ul>
+        </div>
+        <h3>先用纸画坐标轴</h3>
+        <p>
+          在纸上画一架机头向北的飞机。世界系的“北”永远是 +Y；飞机转弯后，
+          机体系的“前方”仍是 +X，但它在世界系中可能指向任意方向。
+          因此一句“推力沿 +X”是不完整的，必须说明是“机体系 +X”。
+        </p>
+        <div class="lesson-box warning">
+          <h3>调试规则</h3>
+          <p>
+            每个变量名或注释都应能回答它属于哪个坐标系。推荐后缀：
+            <code>Fbody</code>、<code>Fworld</code>、<code>vBody</code>、
+            <code>omegaW</code>。方向错误时，先查坐标系，再查正负号。
+          </p>
+        </div>
+        <h3>亲手写三个向量函数</h3>
+        <pre><code>function add(a, b) {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function dot(a, b) {
+  return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+function cross(a, b) {
+  return [
+    a[1]*b[2] - a[2]*b[1],
+    a[2]*b[0] - a[0]*b[2],
+    a[0]*b[1] - a[1]*b[0],
+  ];
+}</code></pre>
+        <p>
+          点积回答“两个方向有多同向”，所以可把轮胎速度投影到滚动方向。
+          叉积回答“绕哪个轴旋转、强度多大”，所以力臂和力的叉积就是力矩。
+        </p>
+        <h3>从二维旋转理解四元数</h3>
+        <p>
+          二维只需一个角度；三维需要旋转轴和角度，而且旋转顺序会影响结果。
+          欧拉角连续积分还会在俯仰接近 90° 时丢失一个自由度。
+          四元数保存的是一个整体旋转，不依赖“先滚转还是先偏航”的人为拆分。
+        </p>
+        <ol class="step-list">
+          <li><h4>先实现轴角四元数</h4><p>单位轴 <code>a</code> 和角度 θ 对应 <code>(a sin(θ/2), cos(θ/2))</code>。</p></li>
+          <li><h4>实现四元数乘法</h4><p>乘法用于组合旋转。顺序不可交换：<code>a⊗b</code> 通常不等于 <code>b⊗a</code>。</p></li>
+          <li><h4>实现向量旋转</h4><p>理论形式是 <code>q(v,0)q*</code>；项目使用展开后的快速公式。</p></li>
+          <li><h4>每步归一化</h4><p>浮点误差会破坏单位长度，归一化是姿态积分不可省略的维护操作。</p></li>
+        </ol>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>
+            用 <code>quat.fromHeadingPitchRoll(π/2,0,0)</code> 创建朝东姿态，
+            再旋转机体前向量 <code>[1,0,0]</code>。结果在 ENU 世界系中应接近 <code>[1,0,0]</code>。
+          </p>
+        </div>
+        <h3>两个坐标系</h3>
+        <div class="two-col">
+          <article>
+            <h4>世界坐标 ENU</h4>
+            <p><code>+X</code> 向东，<code>+Y</code> 向北，<code>+Z</code> 向上。位置、世界速度、地形都使用它。</p>
+          </article>
+          <article>
+            <h4>机体坐标</h4>
+            <p><code>+X</code> 机头，<code>+Y</code> 右翼，<code>+Z</code> 向下。这是航空动力学常用约定。</p>
+          </article>
+        </div>
+        <p>
+          姿态四元数 <code>s.q</code> 表示“机体系向量旋转到世界系”。因此机体推力先在机体系构造，
+          再用 <code>quat.rotate(s.q, forceBody)</code> 变换到世界系；世界速度转换为空速时使用逆旋转。
+        </p>
+        <h3>向量运算</h3>
+        <div class="formula">
+          <span>点积：a · b = a<sub>x</sub>b<sub>x</sub> + a<sub>y</sub>b<sub>y</sub> + a<sub>z</sub>b<sub>z</sub></span>
+          <span>叉积：τ = r × F</span>
+          <span>长度：‖v‖ = √(v<sub>x</sub>² + v<sub>y</sub>² + v<sub>z</sub>²)</span>
+        </div>
+        <p>
+          点积用于投影轮胎速度，叉积用于“力臂 × 力 = 力矩”，归一化用于方向向量。
+          <code>src/math.js</code> 的 <code>vec3</code> 保持纯函数风格，降低状态被意外修改的风险。
+        </p>
+        <h3>为什么使用四元数</h3>
+        <p>
+          欧拉角适合展示，却不适合连续积分，因为会出现万向节锁。四元数
+          <code>q = (x, y, z, w)</code> 可稳定组合旋转。机体系角速度
+          <code>ω = (p,q,r)</code> 的积分关系是：
+        </p>
+        <div class="formula">
+          <b>姿态微分</b>
+          <span>q̇ = 1/2 · q ⊗ (ω<sub>x</sub>, ω<sub>y</sub>, ω<sub>z</sub>, 0)</span>
+          <span>q<sub>next</sub> = normalize(q + q̇Δt)</span>
+        </div>
+        <p>
+          每次积分后归一化非常重要，否则浮点误差会让四元数逐渐失去单位长度，
+          旋转矩阵也会产生缩放和剪切。
+        </p>
+        <h3>矩阵与渲染</h3>
+        <p>
+          WebGL 使用列主序 4×4 矩阵。顶点最终经历
+          <code>clip = projection · view · model · position</code>。
+          法线不能直接乘模型矩阵；存在非均匀缩放时应使用模型矩阵左上 3×3 的逆转置，
+          这就是 <code>normalFromMat4</code> 的用途。
+        </p>
+      </section>
+
+      <section id="webgl" class="chapter">
+        <p class="chapter-no">CHAPTER 4</p>
+        <h2>WebGL2 渲染引擎</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>从空白 Canvas 画出第一个彩色三角形。</li>
+            <li>理解顶点缓冲、索引、VAO、着色器各自保存什么。</li>
+            <li>建立可复用的 <code>Mesh</code>，而不是每个物体手写 WebGL 调用。</li>
+          </ul>
+        </div>
+        <h3>步骤 1：确认 WebGL2 可用</h3>
+        <pre><code>const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2');
+if (!gl) throw new Error('WebGL2 unavailable');</code></pre>
+        <p>
+          先调用 <code>gl.clearColor</code> 和 <code>gl.clear</code> 把背景改成明显的蓝色。
+          如果颜色没有改变，先不要继续写着色器，因为 Canvas 尺寸、脚本路径或上下文创建已经有问题。
+        </p>
+        <h3>步骤 2：写最小着色器</h3>
+        <pre><code>// vertex shader
+#version 300 es
+layout(location=0) in vec3 aPos;
+void main() {
+  gl_Position = vec4(aPos, 1.0);
+}
+
+// fragment shader
+#version 300 es
+precision highp float;
+out vec4 frag;
+void main() {
+  frag = vec4(0.3, 0.9, 0.6, 1.0);
+}</code></pre>
+        <p>
+          顶点着色器对每个顶点运行，必须写出裁剪空间位置；
+          片元着色器对三角形覆盖的像素运行，写出颜色。
+          此时还没有相机，直接使用 −1 到 +1 的裁剪空间坐标。
+        </p>
+        <h3>步骤 3：上传三个顶点</h3>
+        <pre><code>const positions = new Float32Array([
+  -0.6, -0.5, 0,
+   0.6, -0.5, 0,
+   0.0,  0.6, 0,
+]);
+
+const buffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+gl.drawArrays(gl.TRIANGLES, 0, 3);</code></pre>
+        <div class="expected">画布中央出现绿色三角形。若没有，检查着色器编译日志和 Canvas 实际宽高。</div>
+        <h3>步骤 4：为什么要封装 Mesh</h3>
+        <p>
+          一个真实场景有地形、跑道、机身、舵面和旋翼。如果每次绘制都重新绑定三组属性，
+          代码会迅速失控。VAO 记住“属性位置如何解释缓冲”，<code>Mesh.draw()</code>
+          只需绑定 VAO 并调用 <code>drawElements</code>。
+        </p>
+        <h3>步骤 5：加入模型、观察、投影矩阵</h3>
+        <pre><code>gl_Position = uViewProj * uModel * vec4(aPos, 1.0);</code></pre>
+        <p>
+          <code>uModel</code> 把零件局部坐标变到世界坐标；
+          <code>uViewProj</code> 先把世界移到相机坐标，再做透视投影。
+          先只画一个单位盒，再移动相机；不要同时加入光照、雾和复杂机模。
+        </p>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>关闭 <code>gl.CULL_FACE</code>，再交换三角形两个顶点。观察画面为何不再受绕序影响，然后重新开启剔除。</p>
+        </div>
+        <h3>初始化与面剔除</h3>
+        <p>
+          <code>src/engine/gl.js</code> 创建 WebGL2 上下文，开启深度测试与背面剔除。
+          项目约定逆时针顶点为正面，即 <code>gl.frontFace(gl.CCW)</code>。
+          地形或跑道三角形如果顺序写反，就会从上方被当成背面剔除。
+        </p>
+        <h3>着色器程序</h3>
+        <p>
+          <code>src/engine/shader.js</code> 完成“编译顶点着色器 → 编译片元着色器 →
+          链接程序 → 缓存 uniform/attribute 地址”。错误日志在编译阶段抛出，
+          让 GLSL 问题不会静默变成黑屏。
+        </p>
+        <h3>网格抽象</h3>
+        <p>
+          <code>Mesh</code> 把位置、法线、颜色分别上传到属性位置 0、1、2，
+          并把 VAO 保存为可重复绘制的状态集合。静态机模使用
+          <code>STATIC_DRAW</code>，不断重建高度的地形使用 <code>DYNAMIC_DRAW</code>
+          和 <code>bufferSubData</code>。
+        </p>
+        <div class="formula">
+          <b>三角形法线方向</b>
+          <span>n = (b − a) × (c − a)</span>
+          <span>若 n<sub>z</sub> &gt; 0，则从上方看 a→b→c 为逆时针。</span>
+        </div>
+        <h3>光照与雾</h3>
+        <p>
+          场景片元着色器混合半球环境光和单方向漫反射。距离雾使用指数形式：
+        </p>
+        <div class="formula">
+          <span>f = clamp(1 − e<sup>−ρd</sup>, 0, 1)</span>
+          <span>C = mix(C<sub>lit</sub>, C<sub>fog</sub>, f)</span>
+        </div>
+        <p>
+          <em>d</em> 是相机到片元距离，<em>ρ</em> 是雾密度。指数雾在远距离逐渐趋近 1，
+          能自然隐藏有限地形窗口的边缘。
+        </p>
+      </section>
+
+      <section id="world" class="chapter">
+        <p class="chapter-no">CHAPTER 5</p>
+        <h2>程序世界：噪声、地形、跑道与天空</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>从一个平面网格开始，逐步变成程序地形。</li>
+            <li>理解为什么物理碰撞和视觉地形必须调用同一个高度函数。</li>
+            <li>实现不会无限占用显存的滑动地形窗口。</li>
+          </ul>
+        </div>
+        <h3>步骤 1：先生成完全平坦的网格</h3>
+        <p>
+          设网格有 <code>nx × ny</code> 个格子，则顶点数是
+          <code>(nx+1)(ny+1)</code>。每个格子拆成两个三角形：
+        </p>
+        <pre><code>const a = j * stride + i;
+const b = a + 1;
+const c = a + stride;
+const d = c + 1;
+indices.push(a, b, c, b, d, c);</code></pre>
+        <p>
+          从 +Z 上方看，这个顺序是逆时针。先让所有高度为零，并给法线
+          <code>[0,0,1]</code>。确认整个平面可见后再加入噪声。
+        </p>
+        <h3>步骤 2：写可重复的随机函数</h3>
+        <p>
+          不能在每次采样时调用 <code>Math.random()</code>，否则同一地点每帧高度不同。
+          整数哈希把格点坐标映射到固定伪随机值，然后在四个格点间平滑插值。
+        </p>
+        <pre><code>const ux = tX*tX*(3 - 2*tX);
+const uy = tY*tY*(3 - 2*tY);
+const lower = lerp(v00, v10, ux);
+const upper = lerp(v01, v11, ux);
+return lerp(lower, upper, uy);</code></pre>
+        <h3>步骤 3：从噪声得到山脉</h3>
+        <p>
+          单层噪声像缓慢起伏的布。叠加高频低振幅层后，低频决定山体，
+          高频决定岩石细节。先用两层观察，再增加到五层，避免不知道哪一层造成异常。
+        </p>
+        <h3>步骤 4：让地形跟随飞机</h3>
+        <p>
+          无限地形并不意味着无限顶点。将飞机坐标除以格子尺寸并取整，
+          得到当前中心格。只有中心格变化时才重写顶点缓冲。
+        </p>
+        <pre><code>const centerI = Math.round(planeX / TILE);
+const centerJ = Math.round(planeY / TILE);
+if (centerI !== oldI || centerJ !== oldJ) {
+  rebuild(centerI, centerJ);
+}</code></pre>
+        <div class="why">窗口随飞机移动时，顶点使用真实世界坐标，而不是永远围绕原点。这样跑道、碰撞和小地图仍共享同一坐标。</div>
+        <h3>步骤 5：共享 groundHeight</h3>
+        <p>
+          地形渲染、起落架碰撞、四轴接地和小地图都调用
+          <code>groundHeight(x,y)</code>。如果渲染自己保存一份高度数组而物理使用另一算法，
+          飞机会漂浮或陷入地面。
+        </p>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>把机场压平半径临时改为 0，观察跑道如何穿过山坡；再恢复半径并调整平滑过渡带，比较硬切与 smoothstep 的差异。</p>
+        </div>
+        <h3>值噪声与 FBM</h3>
+        <p>
+          <code>valueNoise</code> 对网格四角生成确定性伪随机值，再使用平滑曲线
+          <code>3t²−2t³</code> 做双线性插值。单层噪声过于柔和，因此
+          <code>fbm</code> 叠加多个频率层：
+        </p>
+        <div class="formula">
+          <b>Fractal Brownian Motion</b>
+          <span>H(x,y) = Σ a<sub>i</sub>N(f<sub>i</sub>x, f<sub>i</sub>y) / Σa<sub>i</sub></span>
+          <span>f<sub>i+1</sub> = lacunarity · f<sub>i</sub></span>
+          <span>a<sub>i+1</sub> = gain · a<sub>i</sub></span>
+        </div>
+        <h3>滑动高度场</h3>
+        <p>
+          地形不是无限网格，而是围绕飞机的 80×80 单元窗口，每格 50 m。
+          飞机跨过网格边界后，顶点位置、法线和颜色被重新采样并上传。
+          物理和渲染共享同一个 <code>groundHeight(x,y)</code>，因此视觉地面与碰撞地面一致。
+        </p>
+        <h3>高度场法线</h3>
+        <p>相邻高度的中心差分近似坡度：</p>
+        <div class="formula">
+          <span>ñ = (h<sub>left</sub> − h<sub>right</sub>, h<sub>down</sub> − h<sub>up</sub>, 2Δ)</span>
+          <span>n = ñ / ‖ñ‖</span>
+        </div>
+        <p>
+          法线的 <code>z</code> 分量还用于估算坡度并压暗陡坡。机场附近通过平滑插值将高度压到零，
+          从而保证跑道平整又不产生突兀断崖。
+        </p>
+        <h3>天空为何只需一个三角形</h3>
+        <p>
+          <code>src/world/sky.js</code> 生成覆盖屏幕的超大三角形，不提交传统天空球顶点。
+          片元着色器用逆视图投影矩阵重建世界射线，根据射线的向上分量混合天顶、地平线和地雾，
+          再用 <code>dot(viewDir, sunDir)</code> 的高次幂绘制太阳盘与光晕。
+        </p>
+      </section>
+
+      <section id="fixed-wing" class="chapter">
+        <p class="chapter-no">CHAPTER 6</p>
+        <h2>固定翼六自由度动力学</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>从“自由落体盒子”逐步实现一架能起飞、配平、失速和着陆的固定翼。</li>
+            <li>理解每个气动系数在代码中控制什么现象。</li>
+            <li>学会用单位和数量级检查公式，而不是只靠试飞猜参数。</li>
+          </ul>
+        </div>
+        <div class="lesson-box prereq">
+          <h3>前置知识</h3>
+          <p>
+            完成本教程第 2、3 章，知道固定步长、机体系和世界系，并能使用向量加法、叉积与四元数旋转。
+            不需要预先学习流体力学。
+          </p>
+        </div>
+        <h3>里程碑 1：只实现重力</h3>
+        <p>先把飞机当作没有空气的刚体：</p>
+        <pre><code>const gravity = [0, 0, -mass * 9.80665];
+const acceleration = scale(gravity, 1 / mass);
+state.vel = addScaled(state.vel, acceleration, dt);
+state.pos = addScaled(state.pos, state.vel, dt);</code></pre>
+        <div class="expected">从空中生成时，飞机竖直加速下落。它不会向前飞，也不会改变姿态。</div>
+        <div class="why">从最简单的力开始，可以先验证世界 +Z、重力符号、质量单位和积分器。如果这一步方向错误，加入升力后只会更难排查。</div>
+
+        <h3>里程碑 2：加入机体前向推力</h3>
+        <p>
+          推力定义在机体系 +X。不能直接加到世界 X，因为飞机转向后机头不再朝东。
+        </p>
+        <pre><code>const thrustBody = [thrustNewton, 0, 0];
+const thrustWorld = quat.rotate(state.q, thrustBody);
+forceWorld = add(forceWorld, thrustWorld);</code></pre>
+        <div class="expected">水平生成的飞机会向机头方向加速，但仍然下落，因为还没有升力。</div>
+        <p>
+          用牛顿第二定律估算：3000 N 推动 1100 kg 飞机，静止时仅推力贡献约
+          <code>2.73 m/s²</code>。若代码产生几十倍加速度，通常是把质量遗漏了。
+        </p>
+
+        <h3>里程碑 3：计算空气相对速度</h3>
+        <p>
+          物理状态中的速度在世界系，但气动公式需要机体系分量 <code>(u,v,w)</code>：
+        </p>
+        <pre><code>const vBody = quat.rotateInv(state.q, state.vel);
+const [u, v, w] = vBody;
+const speed = Math.hypot(u, v, w);
+const alpha = Math.atan2(w, u);
+const beta = Math.asin(clamp(v / speed, -1, 1));</code></pre>
+        <p>
+          在本项目机体系中 +Z 向下。当飞机机头相对速度方向抬高时，
+          速度在机体系中出现正 <code>w</code>，所以正攻角来自 <code>atan2(w,u)</code>。
+        </p>
+        <div class="lesson-box warning">
+          <h3>常见错误：把“相对风”与“飞机穿过空气的速度”混用</h3>
+          <p>
+            本代码把 <code>vBody</code> 当作飞机相对空气的速度方向，因此阻力沿其反方向。
+            如果你改成气流吹向飞机的“相对风”定义，攻角和力方向都要同时翻转。
+          </p>
+        </div>
+
+        <h3>里程碑 4：加入最小升力与阻力</h3>
+        <ol class="step-list">
+          <li>
+            <h4>计算空气密度和动压</h4>
+            <p><code>Q = 0.5 * rho * V * V</code>，单位是 Pa，也就是 N/m²。</p>
+          </li>
+          <li>
+            <h4>计算升力系数</h4>
+            <p><code>CL = CL0 + CLa * alpha</code>。注意 <code>CLa</code> 的单位是“每弧度”，不是每度。</p>
+          </li>
+          <li>
+            <h4>变成牛顿</h4>
+            <p><code>L = Q * S * CL</code>。面积 <code>S</code> 把单位面积压力变成总力。</p>
+          </li>
+          <li>
+            <h4>计算阻力</h4>
+            <p>先用常数 <code>CD0</code>，再加入诱导阻力 <code>CL²/(πeAR)</code>。</p>
+          </li>
+          <li>
+            <h4>投回机体系</h4>
+            <p>升力垂直于速度，阻力反向于速度；项目在 X-Z 平面按攻角旋转组合。</p>
+          </li>
+        </ol>
+        <pre><code>const Fx = L * Math.sin(alpha) - D * Math.cos(alpha);
+const Fz = -L * Math.cos(alpha) - D * Math.sin(alpha);
+const forceBody = [Fx, sideForce, Fz];</code></pre>
+        <div class="expected">给定足够前向速度后，飞机不再自由落体；改变攻角会改变升力，但姿态暂时仍不会自行变化。</div>
+
+        <h3>里程碑 5：加入失速，而不是限制攻角</h3>
+        <p>
+          不要在超过 15° 时直接把攻角夹回 15°，那会让飞机永远保持最大升力。
+          正确做法是让升力曲线在峰值后下降，同时阻力显著增加。
+        </p>
+        <pre><code>const sigma = clamp((abs(alpha) - stallAngle) / blendWidth, 0, 1);
+const clAttached = clamp(CL0 + CLa * alpha, -CLmax, CLmax);
+const clSeparated = Math.sin(2 * alpha);
+const CL = lerp(clAttached, clSeparated, sigma);</code></pre>
+        <p>
+          这里不是高精度翼型模型，而是行为模型：小攻角保持线性，高攻角逐渐接近平板流动。
+          测试只要求 25° 的升力低于 13°，确保“拉得更多”不会永远“升得更多”。
+        </p>
+
+        <h3>里程碑 6：让飞机能够转动</h3>
+        <p>
+          到目前为止，飞机可能像一块始终保持方向的魔法滑板。现在加入滚转、俯仰、偏航力矩。
+          每个系数项都可理解为“某种状态对某个力矩的贡献”：
+        </p>
+        <ul>
+          <li><code>Cma &lt; 0</code>：正攻角产生低头力矩，提供纵向静稳定。</li>
+          <li><code>Cmq &lt; 0</code>：正俯仰角速度产生反向阻尼。</li>
+          <li><code>Clda</code>：副翼产生滚转力矩。</li>
+          <li><code>Cndr</code>：方向舵产生偏航力矩。</li>
+          <li><code>Cnda</code>：副翼引起反向偏航。</li>
+        </ul>
+        <p>先只启用舵面项，确认方向；再逐项加入静稳定和阻尼。一次打开全部项会让符号错误很难定位。</p>
+
+        <h3>里程碑 7：加入配平和襟翼</h3>
+        <p>
+          配平在代码中作为“额外升降舵等效偏角”。它不是自动驾驶，而是改变松杆时的平衡点。
+          襟翼同时增加升力、阻力并改变俯仰力矩；只增加升力会让襟翼成为没有代价的作弊按钮。
+        </p>
+
+        <h3>里程碑 8：加入三点起落架</h3>
+        <p>
+          对每个轮子执行“位置 → 穿透 → 接触点速度 → 法向力 → 摩擦 → 力矩”。
+          先只实现垂直弹簧，让飞机站住；再加入滚动摩擦；最后加入刹车、侧向抓地和前轮转向。
+        </p>
+        <div class="expected">飞机静止时三个轮子接触，满油门沿跑道加速；达到约 55 kt 后拉杆可离地；重着陆会触发坠毁。</div>
+
+        <h3>如何调参而不迷路</h3>
+        <ol>
+          <li>先固定质量和几何，因为它们是其他系数的基准。</li>
+          <li>用起飞距离调静推力与地面阻力。</li>
+          <li>用巡航余功率调推力随空速衰减和寄生阻力。</li>
+          <li>用配平测试调 <code>Cm0/Cma/Cmde</code>。</li>
+          <li>用短时舵输入调操纵效能，再用阻尼项调回中后的衰减。</li>
+          <li>每改一组参数就运行测试，不同时改五组。</li>
+        </ol>
+        <div class="exercise">
+          <h4>动手练习：做一个“无阻力世界”</h4>
+          <p>
+            临时把所有 <code>CD</code> 项设为零，观察飞机如何不断加速。
+            再只恢复 <code>CD0</code> 和诱导阻力，比较高速与高升力状态分别由哪一项限制。
+          </p>
+        </div>
+        <h3>状态与空速</h3>
+        <p>
+          状态由世界位置 <code>p</code>、世界速度 <code>v</code>、姿态
+          <code>q</code> 和机体角速度 <code>ω=(p,q,r)</code> 构成。
+          无风条件下，机体相对空气的速度就是世界速度旋转回机体系。
+        </p>
+        <div class="formula">
+          <span>V = √(u² + v² + w²)</span>
+          <span>α = atan2(w, u)</span>
+          <span>β = asin(v / V)</span>
+          <span>Q = 1/2 ρV²</span>
+        </div>
+        <p>
+          攻角 <em>α</em> 描述机头弦线相对气流的上下夹角；侧滑角 <em>β</em>
+          描述气流从机体侧面进入的程度；动压 <em>Q</em> 是所有气动力随速度平方增长的来源。
+        </p>
+        <h3>升力与失速</h3>
+        <div class="formula">
+          <span>C<sub>L,lin</sub> = C<sub>L0</sub> + C<sub>Lα</sub>α + ΔC<sub>L,flap</sub></span>
+          <span>L = QS C<sub>L</sub></span>
+        </div>
+        <p>
+          小攻角时使用线性升力曲线。超过失速攻角后，代码将线性模型平滑混合到
+          <code>sin(2α)</code> 平板模型，使升力峰值后下降，而不是无限增长。
+        </p>
+        <h3>阻力</h3>
+        <div class="formula">
+          <span>C<sub>D</sub> = C<sub>D0</sub> + C<sub>Dgear</sub> + C<sub>Dflap</sub> + C<sub>L</sub>²/(πeAR) + C<sub>Dsep</sub></span>
+          <span>D = QS C<sub>D</sub></span>
+        </div>
+        <p>
+          第一组是寄生阻力，平方项是有限翼诱导阻力，失速分离项在高攻角快速增加。
+          <em>e</em> 是奥斯瓦尔德效率，<em>AR=b²/S</em> 是展弦比。
+        </p>
+        <h3>气动力矩</h3>
+        <div class="formula">
+          <span>C<sub>m</sub> = C<sub>m0</sub> + C<sub>mα</sub>α + C<sub>mq</sub>q̂ + C<sub>mδe</sub>δe</span>
+          <span>C<sub>l</sub> = C<sub>lβ</sub>β + C<sub>lp</sub>p̂ + C<sub>lr</sub>r̂ + C<sub>lδa</sub>δa + C<sub>lδr</sub>δr</span>
+          <span>C<sub>n</sub> = C<sub>nβ</sub>β + C<sub>nr</sub>r̂ + C<sub>np</sub>p̂ + C<sub>nδr</sub>δr + C<sub>nδa</sub>δa</span>
+        </div>
+        <p>
+          带帽角速度是无量纲量，例如 <code>p̂=pb/(2V)</code>。
+          这样同一组导数可以在不同速度下保持相似物理意义。最终力矩为
+          <code>Mx=QSbCl</code>、<code>My=QScCm</code>、<code>Mz=QSbCn</code>。
+        </p>
+        <h3>发动机与大气</h3>
+        <div class="formula">
+          <span>x<sub>next</sub> = x + (command − x)(1 − e<sup>−Δt/τ</sup>)</span>
+          <span>T = T<sub>static</sub> clamp(1 − V/V<sub>max</sub>,0,1)x</span>
+          <span>ρ(h)=ρ<sub>0</sub>(1−2.2558×10<sup>−5</sup>h)<sup>4.2559</sup></span>
+          <span>IAS = TAS √(ρ/ρ<sub>0</sub>)</span>
+        </div>
+        <h3>刚体积分</h3>
+        <p>线运动使用半隐式欧拉：先更新速度，再用新速度更新位置。</p>
+        <div class="formula">
+          <span>a = F/m</span>
+          <span>v<sub>n+1</sub> = v<sub>n</sub> + aΔt</span>
+          <span>p<sub>n+1</sub> = p<sub>n</sub> + v<sub>n+1</sub>Δt</span>
+        </div>
+        <p>角运动使用欧拉刚体方程，对角惯量情况下：</p>
+        <div class="formula">
+          <span>ṗ = [L − (I<sub>z</sub>−I<sub>y</sub>)qr] / I<sub>x</sub></span>
+          <span>q̇ = [M − (I<sub>x</sub>−I<sub>z</sub>)rp] / I<sub>y</sub></span>
+          <span>ṙ = [N − (I<sub>y</sub>−I<sub>x</sub>)pq] / I<sub>z</sub></span>
+        </div>
+        <h3>起落架</h3>
+        <p>
+          每个轮子是机体系中的接触点。将其旋转到世界系后与地面高度比较，穿透量
+          <em>d</em> 产生弹簧阻尼法向力：
+        </p>
+        <div class="formula">
+          <span>F<sub>N</sub> = max(0, kd − cv<sub>z</sub>)</span>
+          <span>|F<sub>friction</sub>| ≤ μF<sub>N</sub></span>
+          <span>τ<sub>gear</sub> = r<sub>body</sub> × F<sub>body</sub></span>
+        </div>
+      </section>
+
+      <section id="quad" class="chapter">
+        <p class="chapter-no">CHAPTER 7</p>
+        <h2>四轴动力学：复用输入，不复用飞行模型</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>从固定翼项目中分离出第二套模拟，而不复制主循环和输入。</li>
+            <li>计算理论悬停油门。</li>
+            <li>实现一个容易驾驶的角速度闭环，而不是直接把摇杆当力矩。</li>
+          </ul>
+        </div>
+        <h3>步骤 1：先只做垂直运动</h3>
+        <p>
+          创建质量、最大推力和油门响应三个参数。忽略姿态，只沿世界 +Z 施加向上推力：
+        </p>
+        <pre><code>const thrust = maxThrust * throttleState;
+const accelerationZ = thrust / mass - gravity;
+velocityZ += accelerationZ * dt;
+height += velocityZ * dt;</code></pre>
+        <p>
+          理论悬停点来自 <code>T=mg</code>。当前参数为 1.6 kg 和 32 N：
+        </p>
+        <div class="formula">
+          <span>hover = 1.6 × 9.80665 / 32 ≈ 0.49</span>
+        </div>
+        <div class="expected">约 49% 油门悬停，低于它下降，高于它上升。若悬停点不是这个数量级，先查单位和重力符号。</div>
+
+        <h3>步骤 2：让推力跟随姿态</h3>
+        <p>
+          四轴推力沿机体上方，也就是本项目机体系 −Z。将
+          <code>[0,0,-T]</code> 旋转到世界系。倾斜后总推力的一部分变成水平分量，
+          垂直分量减少，所以保持高度需要增加油门。
+        </p>
+        <div class="why">这一步自然产生“倾斜才能平移”的四轴行为，不需要额外写前进力。</div>
+
+        <h3>步骤 3：先尝试直接力矩，再理解它为什么难开</h3>
+        <pre><code>torqueX = ctrl.aileron * maxTorque;</code></pre>
+        <p>
+          直接力矩模式意味着摇杆回中后力矩为零，但已有角速度不会立即停止。
+          初学者会发现四轴像在太空中旋转，需要反打摇杆才能刹住。
+        </p>
+        <h3>步骤 4：改为目标角速度</h3>
+        <pre><code>const targetRate = input * maxRate;
+const error = targetRate - currentRate;
+const torque = clamp(error * gain - damping * currentRate,
+                     -maxTorque, maxTorque);</code></pre>
+        <p>
+          摇杆回中时目标角速度为零，控制器自动产生反向力矩制动。
+          这不是姿态自稳：如果飞机已经倾斜，它会停止继续翻滚，但保持当前倾角。
+        </p>
+        <h3>步骤 5：加入线性阻力和地面</h3>
+        <p>
+          没有空气阻力时，倾斜一会儿得到的水平速度会永久保持。
+          简化线性阻力 <code>Fdrag=-cv</code> 能让速度逐渐衰减。
+          地面先用中心高度约束完成最小版本，之后可扩展到四支脚接触。
+        </p>
+        <h3>步骤 6：接入机型分派</h3>
+        <pre><code>if (state.aircraftType === 'quad') {
+  stepQuad(state, ctrl, FIXED_DT, groundHeight);
+} else {
+  stepPhysics(state, ctrl, FIXED_DT, groundHeight);
+}</code></pre>
+        <p>
+          切换时必须重置位置、速度、姿态、油门状态和控制对象。
+          否则固定翼 80% 油门会直接带入四轴，切换瞬间就升空。
+        </p>
+        <div class="exercise">
+          <h4>进阶练习：姿态自稳模式</h4>
+          <p>
+            将摇杆映射为目标滚转/俯仰角，先用姿态误差产生目标角速度，
+            再沿用现有角速度内环。这样形成“姿态外环 + 角速度内环”。
+          </p>
+        </div>
+        <p>
+          四轴模式仍接收固定翼命名的控制量，但语义变成：
+          <code>aileron→滚转角速度</code>、<code>elevator→俯仰角速度</code>、
+          <code>rudder→偏航角速度</code>、<code>throttle→总推力</code>。
+        </p>
+        <h3>总推力</h3>
+        <p>四个旋翼合并为沿机体向上方向（机体系 −Z）的总推力：</p>
+        <div class="formula">
+          <span>F<sub>thrust,body</sub> = (0,0,−T<sub>max</sub>x)</span>
+          <span>F<sub>world</sub> = R(q)F<sub>body</sub> + (0,0,−mg) − c<sub>d</sub>v</span>
+          <span>悬停油门 ≈ mg/T<sub>max</sub></span>
+        </div>
+        <h3>角速度闭环</h3>
+        <p>
+          输入不是直接力矩，而是期望角速度。一个简化 P 控制器比较目标与当前角速度：
+        </p>
+        <div class="formula">
+          <span>ω<sub>target</sub> = input · ω<sub>max</sub></span>
+          <span>τ = clamp[K(ω<sub>target</sub>−ω) − c<sub>ω</sub>ω, −τ<sub>max</sub>, τ<sub>max</sub>]</span>
+        </div>
+        <p>
+          这类似飞控的 rate mode：松杆时目标角速度回到零，因此旋转会停止，
+          但当前倾角不会自动回正。若要实现自稳模式，应增加姿态目标外环。
+        </p>
+        <h3>简化地面接触</h3>
+        <p>
+          四轴没有逐支脚弹簧，而是把机体中心限制在
+          <code>ground + groundClearance</code> 以上。接地时清除向下速度并快速衰减水平速度。
+          这是成本很低的近似，适用于小型演示；精细模拟可改为四个接触点。
+        </p>
+      </section>
+
+      <section id="input" class="chapter">
+        <p class="chapter-no">CHAPTER 8</p>
+        <h2>输入系统：从硬件噪声到统一控制量</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>实现键盘连续控制和一次性动作。</li>
+            <li>安全枚举多个 Gamepad，并允许用户主动选择。</li>
+            <li>理解死区、expo、增量油门和按钮边沿。</li>
+          </ul>
+        </div>
+        <h3>先实现键盘，因为它最容易调试</h3>
+        <ol class="step-list">
+          <li>
+            <h4>用 Set 保存按住状态</h4>
+            <pre><code>window.addEventListener('keydown', e =&gt; down.add(e.key.toLowerCase()));
+window.addEventListener('keyup', e =&gt; down.delete(e.key.toLowerCase()));</code></pre>
+          </li>
+          <li>
+            <h4>每帧从状态生成舵量</h4>
+            <p>左键为 −1，右键为 +1；两者同时按下相互抵消。</p>
+          </li>
+          <li>
+            <h4>单独保存边沿动作</h4>
+            <p>襟翼不能在按住 F 时每帧切一档，因此只在非重复 <code>keydown</code> 时加入动作队列。</p>
+          </li>
+        </ol>
+        <h3>再实现手柄的最小读取</h3>
+        <pre><code>const pads = navigator.getGamepads();
+for (const pad of pads) {
+  if (!pad) continue;
+  console.log(pad.index, pad.id, pad.axes, pad.buttons);
+}</code></pre>
+        <p>
+          注意数组中会有 <code>null</code>，设备索引也不保证连续。
+          先在控制台观察自己的手柄轴和按钮，再假设标准映射。
+        </p>
+        <h3>不要自动选第一个设备</h3>
+        <p>
+          飞行玩家可能同时连接油门台、脚舵和手柄。“第一个设备”可能不是主控制器。
+          把设备列表显示在 <code>select</code> 中，只有用户选择后才保存索引。
+        </p>
+        <h3>实现轴整形</h3>
+        <ol>
+          <li>若绝对值小于死区，返回零。</li>
+          <li>把死区外的剩余行程重新映射到 0..1，否则满杆达不到 1。</li>
+          <li>混合线性与三次曲线，让中心柔和、末端仍有权威。</li>
+          <li>最后 clamp 到 −1..1，防止设备报告异常值。</li>
+        </ol>
+        <h3>实现按钮边沿</h3>
+        <pre><code>const now = buttonValue &gt; 0.5;
+const was = previousValue &gt; 0.5;
+if (now &amp;&amp; !was) actions.push('pause');</code></pre>
+        <p>
+          每次采样后保存按钮数组。切换设备时清空上一帧状态，否则新设备当前按住的按钮
+          可能与旧设备状态比较，产生幽灵动作。
+        </p>
+        <h3>实现 RB 修饰键</h3>
+        <p>
+          先读取 RB，再决定右摇杆的语义。RB 按下时，右 Y 产生配平增量，
+          右摇杆视角输出强制归零；左摇杆主操纵保持可用。
+        </p>
+        <div class="lesson-box warning">
+          <h3>浏览器兼容排查顺序</h3>
+          <ol>
+            <li>确认 Windows 游戏控制器面板能看到设备。</li>
+            <li>使用顶层 <code>http://localhost</code> 页面，不使用受限 iframe。</li>
+            <li>按一次手柄按钮后刷新枚举。</li>
+            <li>过滤 <code>null</code> 槽位。</li>
+            <li>比较 Chrome/Edge 与 Firefox 的枚举差异。</li>
+          </ol>
+        </div>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>在 HUD 临时显示四个轴原始值和整形后值。轻推摇杆，观察死区和 expo 如何改变曲线。</p>
+        </div>
+        <h3>死区与指数曲线</h3>
+        <p>摇杆中心通常不会精确回到零。先去除死区，再混合线性和三次曲线：</p>
+        <div class="formula">
+          <span>a = (|x|−d)/(1−d)，当 |x|≥d</span>
+          <span>y = sign(x)[(1−e)a + ea³]</span>
+        </div>
+        <p>
+          死区 <em>d=0.12</em> 消除漂移，expo <em>e=0.4</em> 降低中心灵敏度，
+          同时仍能在摇杆末端达到满舵。
+        </p>
+        <h3>连续输入与边沿动作</h3>
+        <p>
+          舵量、刹车和视角是“每帧采样”的连续值；襟翼、暂停、视角切换是
+          “按下瞬间触发”的动作。手柄通过比较本帧与上一帧按钮值检测边沿，
+          键盘通过忽略 <code>repeat</code> 的 <code>keydown</code> 实现。
+        </p>
+        <h3>Gamepad API 的现实问题</h3>
+        <p>
+          <code>navigator.getGamepads()</code> 返回稀疏数组，其中可能包含 <code>null</code>；
+          浏览器还可能要求用户先按一次手柄按钮。项目同时监听连接事件、轮询设备、
+          缓存已知设备，并提供手动刷新和权限诊断。
+        </p>
+        <h3>油门为什么是增量</h3>
+        <p>
+          键盘 W/S 和手柄 A/B 是按钮，没有绝对轴，因此输入层输出
+          <code>throttleDelta</code>，主循环把它积分到持久的 <code>ctrl.throttle</code>。
+          舵面则直接使用当帧值，松手立即回中。
+        </p>
+      </section>
+
+      <section id="render-ui" class="chapter">
+        <p class="chapter-no">CHAPTER 9</p>
+        <h2>程序机模、相机、HUD 与声音</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>用基础盒体搭出可辨认的两种机模。</li>
+            <li>正确实现“绕铰链旋转”的舵面动画。</li>
+            <li>从一个十字准星逐步构建 HUD、小地图和程序声音。</li>
+          </ul>
+        </div>
+        <h3>机模步骤 1：只做静态轮廓</h3>
+        <p>
+          固定翼先用一个长盒表示机身、一个薄盒表示机翼、两个小盒表示尾翼。
+          不要一开始就做舵面。先从追逐相机确认 +X 真的是机头，+Y 真的是右翼。
+        </p>
+        <h3>机模步骤 2：将静态几何合并</h3>
+        <p>
+          每个盒子单独绘制会增加 draw call。将不动的零件合并为一个 Mesh；
+          只有升降舵、副翼、方向舵和螺旋桨保留独立 Mesh。
+        </p>
+        <h3>机模步骤 3：正确构造铰链</h3>
+        <ol class="step-list">
+          <li><h4>把舵面几何放到真实位置</h4><p>例如方向舵顶点本身就应位于机尾，而不是留在原点。</p></li>
+          <li><h4>记录铰链点</h4><p>铰链点也使用机体局部坐标，例如尾部某个 <code>[x,y,z]</code>。</p></li>
+          <li><h4>构造 T(p)RT(−p)</h4><p>该局部矩阵只旋转舵面，场景随后再乘飞机世界矩阵。</p></li>
+          <li><h4>用小输入检查符号</h4><p>右方向舵时后缘向右；右滚转时右翼副翼上、左翼副翼下。</p></li>
+        </ol>
+        <div class="why">视觉舵面不是装饰，它是坐标和符号的调试仪器。动画方向错往往预示物理控制符号也值得重新检查。</div>
+
+        <h3>相机步骤：从固定跟随到三模式</h3>
+        <p>
+          最初只需 <code>eye = pos - forward*distance + worldUp*height</code>。
+          然后对 eye 和 target 做插值，消除物理高频抖动。座舱相机改用机体 up，
+          追逐相机仍用世界 up，避免飞机滚转时画面完全翻转。
+        </p>
+
+        <h3>HUD 步骤 1：先画固定准星</h3>
+        <p>
+          在 2D Canvas 中每帧先清屏并按 DPR 设置变换。画布 CSS 尺寸和实际像素尺寸不同，
+          忽略 DPR 会让高分屏文字模糊。
+        </p>
+        <h3>HUD 步骤 2：人工地平线</h3>
+        <p>
+          将 Canvas 原点移到屏幕中心，按负滚转角旋转，再按俯仰角上下平移刻度线。
+          最后恢复变换并绘制固定飞机符号。这样动的是“世界地平线”，不是飞机符号。
+        </p>
+        <h3>HUD 步骤 3：滚动带</h3>
+        <p>
+          对速度带，遍历当前速度附近的整十刻度，把差值乘像素比例得到 Y 坐标；
+          用 clip 限制在带框内，再覆盖一个固定当前值窗口。高度带同理。
+        </p>
+        <h3>HUD 步骤 4：小地图缓存</h3>
+        <p>
+          离屏 Canvas 只需几十像素。每个像素采样一次 <code>groundHeight</code> 并按高度着色，
+          放大绘制到 HUD。飞机每跨 500 m 才重建底图；跑道、航迹和飞机标记每帧叠加。
+        </p>
+
+        <h3>声音步骤：先单振荡器，再塑造频谱</h3>
+        <ol>
+          <li>用户首次点击后创建 AudioContext，避免自动播放策略拦截。</li>
+          <li>用一个振荡器确认声音链路可用。</li>
+          <li>叠加低频正弦提供厚度、三角波提供主体、少量锯齿提供机械质感。</li>
+          <li>使用低通和 highshelf 压低刺耳高频。</li>
+          <li>用 <code>setTargetAtTime</code> 平滑参数，避免每帧跳变产生咔哒声。</li>
+        </ol>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>
+            临时只保留锯齿波，再逐个恢复低频正弦、三角波和滤波器。
+            用耳朵辨认每个节点对音色的贡献，而不是只复制参数。
+          </p>
+        </div>
+        <h3>程序机模</h3>
+        <p>
+          固定翼和四轴都由盒体组合，不依赖外部模型。静态部分合并为一个 Mesh，
+          可动舵面和旋翼单独绘制。绕任意铰链点旋转使用：
+        </p>
+        <div class="formula">
+          <span>M = T(pivot) · R(axis,angle) · T(−pivot)</span>
+        </div>
+        <p>
+          先把铰链移到原点，旋转，再移回去。舵面几何必须先放在真实机体位置，
+          否则会围绕远处铰链画出错误圆弧。
+        </p>
+        <h3>三种相机</h3>
+        <ul>
+          <li><b>追逐：</b>根据机头水平投影放在后上方，并用插值形成弹簧感。</li>
+          <li><b>座舱：</b>相机跟随机体姿态，右摇杆改变观察方向。</li>
+          <li><b>环绕：</b>相机沿世界坐标圆周运动，摇杆调整速度和高度。</li>
+        </ul>
+        <h3>HUD</h3>
+        <p>
+          HUD 使用独立 2D Canvas，避免为文字和仪表编写 WebGL 字体系统。
+          姿态梯随飞机滚转和俯仰变换，速度/高度带围绕当前值滚动。
+          小地图缓存低分辨率地形，只在中心跨过 500 m 时重建，减少每帧噪声采样。
+        </p>
+        <h3>声音合成</h3>
+        <p>
+          WebAudio 使用锯齿、三角和正弦振荡器叠加发动机频谱，经低通和高频搁架滤波，
+          再按转速改变频率、截止频率和音量。四轴使用更高基频，零油门时真正静音；
+          失速告警是独立方波振荡器，通过增益门控形成间歇蜂鸣。
+        </p>
+      </section>
+
+      <section id="tests" class="chapter">
+        <p class="chapter-no">CHAPTER 10</p>
+        <h2>测试策略：把主观手感变成数值约束</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>把“加速太慢”“方向舵太灵敏”转成可执行断言。</li>
+            <li>写第一个不需要浏览器的物理烟雾测试。</li>
+            <li>理解测试应该保护行为，而不是锁死实现细节。</li>
+          </ul>
+        </div>
+        <h3>步骤 1：让物理模块脱离 DOM</h3>
+        <p>
+          <code>stepPhysics</code> 只接收普通对象、时间步和地面函数。
+          它不读取 Canvas、键盘或 <code>window</code>，因此 Node 可以直接运行。
+          这也是良好分层带来的测试收益。
+        </p>
+        <h3>步骤 2：写最小测试工具</h3>
+        <pre><code>let failures = 0;
+function check(name, condition, detail) {
+  console.log(condition ? '[PASS]' : '[FAIL]', name, detail);
+  if (!condition) failures++;
+}</code></pre>
+        <p>
+          项目不需要完整测试框架也能得到稳定价值。关键是测试进程失败时返回非零退出码，
+          让脚本或 CI 能发现问题。
+        </p>
+        <h3>步骤 3：从用户抱怨反推验收条件</h3>
+        <table>
+          <thead><tr><th>主观反馈</th><th>可测指标</th></tr></thead>
+          <tbody>
+            <tr><td>“加速太慢”</td><td>满油门达到 55 kt 的秒数和滑跑距离</td></tr>
+            <tr><td>“爬升率太低”</td><td>巡航速度下推力余功率对应的理论爬升率</td></tr>
+            <tr><td>“方向舵太灵”</td><td>给定舵量和时间后的偏航角速度上下限</td></tr>
+            <tr><td>“地形看不见”</td><td>首三角形叉积的 Z 分量必须为正</td></tr>
+            <tr><td>“RB 映射错了”</td><td>纯映射函数输出的配平、视角和左摇杆值</td></tr>
+          </tbody>
+        </table>
+        <h3>步骤 4：不要只测“方向正确”</h3>
+        <p>
+          方向舵测试若只断言 <code>r &gt; 0</code>，即使响应大到每秒旋转十圈也会通过。
+          因此项目同时要求它小于合理上限。测试区间应表达可接受行为带，而不是精确浮点值。
+        </p>
+        <h3>步骤 5：调参工作流</h3>
+        <ol>
+          <li>先运行测试记录基准。</li>
+          <li>只修改一组相关参数。</li>
+          <li>重新运行全部测试，而不仅是当前目标测试。</li>
+          <li>在浏览器实际试飞，确认数值通过不等于手感必然优秀。</li>
+          <li>若发现新回归模式，先补测试，再修代码。</li>
+        </ol>
+        <div class="exercise">
+          <h4>动手练习</h4>
+          <p>
+            新增“四轴正方向舵产生正偏航角速度”的测试，并给出合理上限。
+            然后故意翻转 <code>ctrl.rudder</code> 符号，确认测试会失败。
+          </p>
+        </div>
+        <p>
+          该项目没有 DOM 测试框架，而是用 Node 直接导入纯函数和物理模块。
+          测试重点不是逐行覆盖，而是保护容易被调参破坏的系统行为。
+        </p>
+        <table>
+          <thead><tr><th>测试</th><th>保护的行为</th><th>为什么重要</th></tr></thead>
+          <tbody>
+            <tr><td>起飞滑跑</td><td>55 kt 的时间和距离</td><td>同时约束推力、阻力、质量与轮胎摩擦</td></tr>
+            <tr><td>爬升余功率</td><td>巡航速度下仍有正爬升率</td><td>防止只改善地面加速却无法爬升</td></tr>
+            <tr><td>配平巡航</td><td>60 秒不发散</td><td>保护静稳定、阻尼和积分稳定性</td></tr>
+            <tr><td>失速</td><td>高攻角升力下降</td><td>防止线性升力无限增长</td></tr>
+            <tr><td>方向舵/副翼</td><td>方向与响应区间</td><td>保护符号约定和操纵灵敏度</td></tr>
+            <tr><td>四轴悬停</td><td>悬停、爬升、滚转</td><td>保护推重比和角速度闭环</td></tr>
+            <tr><td>手柄</td><td>空槽过滤、RB 配平</td><td>覆盖浏览器 Gamepad API 边界</td></tr>
+            <tr><td>地形</td><td>三角形法线朝上</td><td>防止面剔除导致地面消失</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="file-atlas" class="chapter">
+        <p class="chapter-no">CHAPTER 11</p>
+        <h2>逐文件讲解</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>知道每个文件应该在项目的哪个阶段创建。</li>
+            <li>知道文件依赖谁、向谁提供能力，以及如何单独验收。</li>
+            <li>能够从空目录按顺序复刻当前项目，而不是复制完成品。</li>
+          </ul>
+        </div>
+        <h3>从空目录开始时的文件创建顺序</h3>
+        <table>
+          <thead><tr><th>阶段</th><th>创建文件</th><th>阶段验收</th></tr></thead>
+          <tbody>
+            <tr><td>1. 页面</td><td><code>index.html</code>、<code>css/style.css</code>、<code>src/main.js</code></td><td>模块成功加载，两个 Canvas 铺满屏幕</td></tr>
+            <tr><td>2. WebGL</td><td><code>gl.js</code>、<code>shader.js</code>、<code>mesh.js</code></td><td>画出一个彩色盒子</td></tr>
+            <tr><td>3. 数学/相机</td><td><code>math.js</code>、<code>camera.js</code></td><td>相机能绕盒子观察，矩阵无报错</td></tr>
+            <tr><td>4. 世界</td><td><code>noise.js</code>、<code>terrain.js</code>、<code>runway.js</code>、<code>sky.js</code></td><td>可见地形、跑道和天空</td></tr>
+            <tr><td>5. 状态/输入</td><td><code>state.js</code>、<code>controls.js</code>、<code>keyboard.js</code></td><td>控制值能在控制台连续变化</td></tr>
+            <tr><td>6. 固定翼</td><td><code>aircraft-c172.js</code>、<code>atmosphere.js</code>、<code>aero.js</code>、<code>propulsion.js</code>、<code>physics.js</code></td><td>空中生成后能受控飞行</td></tr>
+            <tr><td>7. 地面</td><td><code>gear.js</code></td><td>能停在跑道、滑跑、起飞和着陆</td></tr>
+            <tr><td>8. 机模/场景</td><td><code>scene.js</code>、<code>aircraft-mesh.js</code></td><td>姿态和舵面视觉与物理一致</td></tr>
+            <tr><td>9. 手柄/UI</td><td><code>gamepad.js</code>、<code>hud.js</code>、<code>audio.js</code></td><td>可选设备、仪表和声音工作</td></tr>
+            <tr><td>10. 四轴</td><td><code>quad.js</code>、<code>quad-mesh.js</code></td><td>可切换并稳定悬停</td></tr>
+            <tr><td>11. 测试</td><td><code>test/*.mjs</code>、<code>package.json</code></td><td>一条命令运行全部行为验收</td></tr>
+            <tr><td>12. 文档</td><td><code>README.md</code>、<code>PLAN.md</code>、<code>guide.html</code></td><td>新读者能运行、理解和继续修改</td></tr>
+          </tbody>
+        </table>
+        <p>下面覆盖项目中的每个文件。每项说明它在系统中的位置、主要实现与修改风险。</p>
+
+        <h3 class="group-title">根目录与页面</h3>
+        <div class="file-list">
+          <article id="file-index"><h4><code>index.html</code></h4><p><b>创建时机：</b>第一个文件。先只放两个 Canvas 和 module script，确认页面可加载；再逐个加入机型、输入下拉框和启动遮罩。<b>输入/输出：</b>不处理数据，只提供 DOM 节点。<b>验收：</b>控制台无元素为 null 的错误，<code>guide.html</code> 链接可独立打开。修改 DOM id 时必须同步 <code>main.js</code>。</p></article>
+          <article><h4><code>guide.html</code></h4><p><b>创建时机：</b>功能稳定后。先列课程大纲，再按依赖关系写章节，最后生成逐文件索引。<b>实现重点：</b>页面不加载 <code>main.js</code>，避免阅读教材时启动 WebGL 和手柄监听。<b>验收：</b>所有目录锚点存在、所有项目文件都有条目、本地链接有效。</p></article>
+          <article><h4><code>css/style.css</code></h4><p><b>创建顺序：</b>先让 <code>html/body/#app</code> 全屏，再将两个 Canvas 绝对叠放，最后添加控制面板。<b>关键点：</b><code>#hud {pointer-events:none}</code>，否则透明 HUD 会吞掉鼠标。<b>验收：</b>窗口缩放时无滚动条，控件始终可点。</p></article>
+          <article><h4><code>css/guide.css</code></h4><p><b>创建顺序：</b>先定义颜色变量和正文宽度，再做 sticky 目录、章节、公式和步骤卡片，最后加移动端媒体查询。<b>验收：</b>窄屏时目录回到文档流，表格可横向滚动，代码块不撑破页面。</p></article>
+          <article><h4><code>package.json</code></h4><p><b>最小实现：</b>先写 <code>{"type":"module"}</code>，确认 Node 能导入源码；再把每个烟雾测试串到 <code>test</code> 脚本。<b>验收：</b><code>npm test</code> 任一断言失败时返回非零退出码。</p></article>
+          <article><h4><code>README.md</code></h4><p><b>写作顺序：</b>启动方式、控制方法、模型摘要、测试命令、目录说明。它服务于“5 分钟运行项目”的读者，所以只保留稳定公开接口。<b>验收：</b>一个没看源码的人能按文档启动并完成首次起飞。</p></article>
+          <article><h4><code>PLAN.md</code></h4><p><b>用途：</b>在编码前写目标、非目标、公式、里程碑和验收标准。完成后不要悄悄改写历史决策，而应注明现状差异。<b>验收：</b>每个重要功能都能追溯到目标或后续明确变更。</p></article>
+        </div>
+
+        <h3 class="group-title">装配与数学</h3>
+        <div class="file-list">
+          <article><h4><code>src/main.js</code></h4><p><b>实现顺序：</b>先实例化模块；再写最小 RAF；再加入固定步累加器；再接输入动作；最后加入机型分派、设备 UI 和音频启动。<b>核心责任：</b>只做生命周期与数据传递，不写气动公式。<b>验收：</b>暂停时物理停止但仍能绘制；重置后插值快照同步，不出现瞬移残影。</p></article>
+          <article><h4><code>src/math.js</code></h4><p><b>实现顺序：</b>标量 clamp/lerp → vec3 → 四元数 → mat4。每增加一个函数先用已知向量手算验证。<b>关键约定：</b>四元数把机体旋到世界，矩阵列主序。<b>验收：</b>单位四元数不改变向量，四元数乘共轭得到单位，lookAt 能稳定观察原点。</p></article>
+        </div>
+
+        <h3 class="group-title">WebGL 引擎</h3>
+        <div class="file-list">
+          <article><h4><code>src/engine/gl.js</code></h4><p><b>实现顺序：</b>创建上下文 → clear 验证 → 深度测试 → 背面剔除 → DPR resize。<b>验收：</b>高分屏边缘清晰；近物体正确遮挡远物体；CCW 三角形从正面可见。</p></article>
+          <article><h4><code>src/engine/shader.js</code></h4><p><b>实现顺序：</b>先写 <code>compile</code> 并输出完整日志，再链接 program，最后缓存活动变量。<b>验收：</b>故意在 GLSL 中写错一个变量名，应收到明确的 vertex/fragment 编译错误而非黑屏。</p></article>
+          <article><h4><code>src/engine/mesh.js</code></h4><p><b>实现顺序：</b>只支持 positions 的三角形 → normals/colors → indices → dynamic update → 几何生成器。<b>验收：</b>盒子六面法线正确；合并两个盒子后索引没有指向前一个几何的错误顶点。</p></article>
+          <article><h4><code>src/engine/camera.js</code></h4><p><b>实现顺序：</b>固定 lookAt → 追逐相机 → 平滑 → 座舱 → 环绕 → 右摇杆观察。<b>验收：</b>追逐相机滚转时世界仍大致向上；座舱相机随飞机翻滚；四轴距离比固定翼更近。</p></article>
+        </div>
+
+        <h3 class="group-title">世界</h3>
+        <div class="file-list">
+          <article><h4><code>src/world/noise.js</code></h4><p><b>实现顺序：</b>先写整数 <code>hash2</code> 并打印相邻格点值；再写 smoothstep；然后完成四角插值；最后用循环叠加 FBM。<b>输入/输出：</b>任意连续坐标 → 约 0..1 的确定值。<b>验收：</b>同一坐标重复调用值相同，跨格点边界没有明显跳变。</p></article>
+          <article><h4><code>src/world/terrain.js</code></h4><p><b>实现顺序：</b>平面网格 → 正确 CCW 索引 → 高度采样 → 法线 → 颜色 → 滑动窗口 → 机场压平。<b>共享接口：</b><code>groundHeight</code> 同时服务渲染、固定翼、四轴和地图。<b>验收：</b>从上方可见、飞机移动时窗口连续、跑道区域高度为零。</p></article>
+          <article><h4><code>src/world/runway.js</code></h4><p><b>实现顺序：</b>先画一条沥青矩形，再循环生成中心线，最后加入入口与瞄准点。<b>关键细节：</b>跑道略高于地形，标线又略高于跑道，避免深度缓冲无法决定谁在上面。<b>验收：</b>远近视角下不闪烁，长度和世界 +Y 方向一致。</p></article>
+          <article><h4><code>src/world/sky.js</code></h4><p><b>实现顺序：</b>固定颜色全屏三角形 → 上下渐变 → 逆矩阵重建射线 → 太阳盘/光晕。绘制前关闭深度写入与测试，绘制后必须恢复。<b>验收：</b>相机旋转时太阳保持世界方向，天空永远在所有物体之后。</p></article>
+        </div>
+
+        <h3 class="group-title">固定翼模拟</h3>
+        <div class="file-list">
+          <article><h4><code>src/sim/state.js</code></h4><p><b>实现顺序：</b>先定义最小位姿状态，再增加发动机、配置和遥测字段；控制对象单独创建；最后写固定翼/控制重置。<b>验收：</b>每次重置后数组都被新建而不是残留引用，油门、崩溃和襟翼恢复初值。</p></article>
+          <article><h4><code>src/sim/aircraft-c172.js</code></h4><p><b>实现方法：</b>按质量几何、升力、阻力、三轴力矩、舵面、推进、起落架分组录入参数，并在注释写清单位。<b>调参纪律：</b>不要在 <code>aero.js</code> 散落魔法数字。<b>验收：</b>所有弧度参数显式由角度转换，起落架位置符合 +Z 向下。</p></article>
+          <article><h4><code>src/sim/atmosphere.js</code></h4><p><b>实现顺序：</b>先返回常数海平面密度，确认飞行正常；再加入高度公式和极高高度保护；最后加入 IAS 转换。<b>验收：</b>0 m 返回 1.225 kg/m³，密度随高度单调下降，负底数不会产生 NaN。</p></article>
+          <article><h4><code>src/sim/propulsion.js</code></h4><p><b>实现顺序：</b>直接油门推力 → 加空速衰减 → 加一阶 spool。使用 <code>1-exp(-dt/tau)</code> 而非简单 <code>dt/tau</code> 可在不同步长下保持响应一致。<b>验收：</b>推力状态不超出 0..1，速度达到 Vmax 后推力为零。</p></article>
+          <article><h4><code>src/sim/aero.js</code></h4><p><b>实现顺序：</b>速度/角度 → 动压 → 线性升力 → 阻力 → 机体系力 → 俯仰矩 → 滚转/偏航矩 → 失速。每一步先返回遥测并观察数值。<b>验收：</b>静止时所有气动力为零；正攻角产生机体 −Z 升力；正副翼产生正滚转矩；深失速 CL 下降。</p></article>
+          <article><h4><code>src/sim/gear.js</code></h4><p><b>实现顺序：</b>单点法向弹簧 → 三接触点 → 接触点角速度 → 滚动摩擦 → 侧向摩擦 → 刹车/转向。<b>验收：</b>静止时法向力总和接近重量；摩擦永远反向于接触点速度；轮子未穿透时不产生拉力。</p></article>
+          <article><h4><code>src/sim/physics.js</code></h4><p><b>装配顺序：</b>更新发动机 → 求机体空速 → 气动 → 推力 → 转世界并加重力 → 接地 → 线积分 → 角积分 → 姿态 → 遥测。<b>验收：</b>每个相加的力都处于同一坐标系；碰撞检查在状态更新的合理位置执行；崩溃后角速度清零。</p></article>
+        </div>
+
+        <h3 class="group-title">四轴模拟</h3>
+        <div class="file-list">
+          <article><h4><code>src/sim/quad.js</code></h4><p><b>实现顺序：</b>垂直推力/重力 → spool → 姿态旋转推力 → 目标角速度控制 → 刚体角积分 → 阻力 → 地面约束 → 遥测。<b>验收：</b><code>mg/Tmax</code> 附近悬停；正滚转输入产生正滚转；零油门落地后不会穿过地面。</p></article>
+        </div>
+
+        <h3 class="group-title">输入</h3>
+        <div class="file-list">
+          <article><h4><code>src/input/controls.js</code></h4><p><b>实现顺序：</b>先只做 clamp，再加死区重映射，最后加入 expo。把函数保持为纯函数，便于在控制台画输入输出表。<b>验收：</b>0 和死区内返回 0，±1 精确返回 ±1，函数保持奇对称。</p></article>
+          <article><h4><code>src/input/keyboard.js</code></h4><p><b>实现顺序：</b>Set 记录按住 → sample 返回连续值 → actions 保存边沿 → dispose 移除监听。<b>验收：</b>松键立即回零；长按 F 只触发一次；左右同时按下输出零；箭头键不会滚动页面。</p></article>
+          <article><h4><code>src/input/gamepad.js</code></h4><p><b>实现顺序：</b>纯映射函数 → 轮询单设备 → 按钮边沿 → 设备列表/选择 → 热插拔缓存 → 权限诊断。先保持映射逻辑可在 Node 测试，再把浏览器 API 包在类中。<b>验收：</b>null 槽位不崩溃，拔插后列表更新，未选手柄时不自动接管。</p></article>
+        </div>
+
+        <h3 class="group-title">渲染</h3>
+        <div class="file-list">
+          <article><h4><code>src/render/scene.js</code></h4><p><b>实现顺序：</b>单着色器画一个 Mesh → 加地形/跑道 → 先画天空 → 加光照雾 → 构造飞机世界矩阵 → 分派机型。<b>验收：</b>每帧 viewport 与 Canvas 一致；天空绘制后恢复深度状态；零件矩阵不会污染下一个 draw。</p></article>
+          <article><h4><code>src/render/aircraft-mesh.js</code></h4><p><b>实现顺序：</b>机身 → 机翼尾翼 → 起落架 → 独立舵面 → 铰链矩阵 → 螺旋桨。每加一个舵面先只输入 ±0.2 检查方向和旋转中心。<b>验收：</b>所有几何位于真实机体局部坐标，右方向舵后缘向右，右翼副翼在右滚时向上。</p></article>
+          <article><h4><code>src/render/quad-mesh.js</code></h4><p><b>实现顺序：</b>中心盒 → 两根机臂 → 前向颜色块 → 电机 → 独立旋翼。<b>验收：</b>前向标记位于 +X；四电机围绕中心对称；相邻旋翼视觉旋向相反；零油门时旋翼停止。</p></article>
+        </div>
+
+        <h3 class="group-title">界面与声音</h3>
+        <div class="file-list">
+          <article><h4><code>src/ui/hud.js</code></h4><p><b>实现顺序：</b>DPR resize → 固定准星 → 姿态梯 → 三个滚动带 → 遥测文字 → 遮罩/帮助 → 小地图。每个绘制函数都用 save/restore 隔离变换。<b>验收：</b>滚转时仅地平线旋转；不同分辨率文字清晰；地图更新不造成明显帧顿。</p></article>
+          <article><h4><code>src/ui/audio.js</code></h4><p><b>实现顺序：</b>用户手势后创建 context → 单振荡器 → gain → 多振荡器 → 滤波 → 随转速平滑参数 → 告警通道。<b>验收：</b>初次加载不报 autoplay 错误；四轴零油门静音；状态变化没有明显咔哒爆音。</p></article>
+        </div>
+
+        <h3 class="group-title">测试</h3>
+        <div class="file-list">
+          <article><h4><code>test/physics-smoke.mjs</code></h4><p><b>编写顺序：</b>先建 flat ground 和 check 工具；每个 IIFE 创建全新状态；按真实秒数循环固定步；输出关键数值。<b>验收：</b>故意降低推力、翻转舵面或删除失速混合时，对应测试必须失败。</p></article>
+          <article><h4><code>test/quad-smoke.mjs</code></h4><p><b>编写顺序：</b>创建 airborne helper → 理论悬停 → 高油门爬升 → 单轴滚转。测试阈值留出积分误差，不比较逐位相等。<b>验收：</b>修改质量后若不调整悬停公式，测试能指出漂移。</p></article>
+          <article><h4><code>test/gamepad-smoke.mjs</code></h4><p><b>编写方法：</b>不用真实浏览器，构造假的 pads、axes 和 buttons 输入纯函数。<b>验收：</b>数组含 null 不抛异常；RB 时 trim 非零、look 为零、左摇杆舵量仍保留。</p></article>
+          <article><h4><code>test/terrain-smoke.mjs</code></h4><p><b>编写方法：</b>用最小 1×1 网格取得前三个索引，手工计算两条边的二维叉积。<b>验收：</b>交换任意两个索引后测试应立即失败，证明它真正保护绕序。</p></article>
+        </div>
+      </section>
+
+      <section id="study-path" class="chapter">
+        <p class="chapter-no">CHAPTER 12</p>
+        <h2>推荐学习与改造路线</h2>
+        <div class="lesson-box goals">
+          <h3>本章目标</h3>
+          <ul>
+            <li>把前面内容转化为可以实际执行的学习计划。</li>
+            <li>知道每个阶段何时算“完成”，避免永远停留在看懂代码。</li>
+            <li>选择一个适合自己的后续功能练习。</li>
+          </ul>
+        </div>
+        <h3>建议按 12 次小提交完成</h3>
+        <ol class="step-list">
+          <li><h4>页面与蓝色清屏</h4><p>提交标准：本地服务器打开后，WebGL Canvas 能稳定铺满窗口。</p></li>
+          <li><h4>第一个三角形与 Mesh</h4><p>提交标准：能用同一 Mesh 类画两个不同位置的盒子。</p></li>
+          <li><h4>数学与相机</h4><p>提交标准：相机可绕原点，四元数旋转结果有简单断言。</p></li>
+          <li><h4>地形与跑道</h4><p>提交标准：飞机位置改变时地形窗口更新且没有裂缝。</p></li>
+          <li><h4>输入协议</h4><p>提交标准：键盘和假手柄产生同形状对象。</p></li>
+          <li><h4>重力、推力和升阻力</h4><p>提交标准：空中初始状态能滑翔，不再像石头下落。</p></li>
+          <li><h4>角运动和舵面</h4><p>提交标准：三轴输入方向正确，松杆后阻尼合理。</p></li>
+          <li><h4>起落架</h4><p>提交标准：从跑道起飞并可轻柔接地。</p></li>
+          <li><h4>HUD、相机与声音</h4><p>提交标准：无需看控制台即可判断速度、高度、油门和告警。</p></li>
+          <li><h4>四轴模式</h4><p>提交标准：同一输入协议可切换，并在理论油门附近悬停。</p></li>
+          <li><h4>行为测试</h4><p>提交标准：关键手感都有数值边界，故意破坏会失败。</p></li>
+          <li><h4>文档与清理</h4><p>提交标准：新读者能从 README 启动，从本教材复刻。</p></li>
+        </ol>
+        <ol class="roadmap">
+          <li><b>先画静态世界：</b>只保留 <code>gl.js</code>、<code>shader.js</code>、<code>mesh.js</code>、<code>scene.js</code>，理解渲染管线。</li>
+          <li><b>让物体移动：</b>阅读 <code>math.js</code> 和 <code>main.js</code>，掌握固定步长和四元数插值。</li>
+          <li><b>加入简化飞行：</b>先实现重力与推力，再逐项加入升力、阻力和力矩。</li>
+          <li><b>加入接地：</b>从单接触点开始，再扩展到三轮起落架和侧向摩擦。</li>
+          <li><b>加入第二机型：</b>仿照 <code>quad.js</code> 保持输入协议不变，只替换动力学解释。</li>
+          <li><b>最后调手感：</b>每次调参都运行测试，并把新的主观要求转成数值断言。</li>
+        </ol>
+        <div class="callout">
+          <strong>一个很实用的原则</strong>
+          <p>渲染可以近似，物理可以简化，但坐标系、符号约定和状态所有权必须明确。大多数“方向反了”与“模型飞走了”都源于这三件事。</p>
+        </div>
+        <p class="footer-note">本页对应当前工作区源码。随着实现变化，应同步更新公式、文件索引与验收条件。</p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
