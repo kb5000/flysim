@@ -1,12 +1,26 @@
 // Xbox gamepad (Gamepad API standard mapping). Hot-pluggable. Produces the same
 // shape as the keyboard sampler plus edge actions, and reports connection state.
 //
+// Bindings follow the MSFS 2020 default Xbox controller profile:
+//   Left stick   = aileron / elevator (pull back = nose up)
+//   Right stick  = camera look-around
+//   LT / RT      = rudder left / right
+//   A / B (hold) = throttle increase / decrease
+//   X (hold)     = brakes
+//   D-pad Up/Dn  = flaps retract / extend one notch
+//   D-pad Left   = parking brake toggle
+//   Y            = reset camera view
+//   View (Back)  = cycle camera,  Menu (Start) = pause
+//   D-pad Right  = reset to runway (FlySim extra; unbound in MSFS)
+//
 // Standard mapping reference:
 //   axes[0] LX, axes[1] LY, axes[2] RX, axes[3] RY
 //   buttons: 0 A,1 B,2 X,3 Y,4 LB,5 RB,6 LT,7 RT,8 Back,9 Start,
 //            12 DpadUp,13 DpadDown,14 DpadLeft,15 DpadRight
 import { conditionAxis } from './controls.js';
 import { clamp } from '../math.js';
+
+const THROTTLE_RATE = 0.5; // full sweep in 2 s, like MSFS's gradual A/B throttle
 
 export class Gamepad {
   constructor() {
@@ -45,36 +59,38 @@ export class Gamepad {
     const a = p.axes, b = p.buttons.map((x) => x.value);
 
     const aileron = conditionAxis(a[0] ?? 0);
-    const elevator = conditionAxis(a[1] ?? 0); // stick forward (negative) -> nose down? LY up is -1
     // LY: pushing forward gives negative; we want forward = nose down = elevator negative.
-    // a[1] forward = -1 -> elevator should be -1 (push). So elevator = conditionAxis(a[1]) gives
-    // forward(-1) -> -1 (nose down). Pull back (+1) -> +1 (nose up). Correct.
+    // Pull back (+1) -> +1 (nose up). Matches MSFS (pull back to climb).
+    const elevator = conditionAxis(a[1] ?? 0);
 
     // rudder from triggers LT(6)/RT(7): right positive
     const lt = b[6] ?? 0, rt = b[7] ?? 0;
     const rudder = clamp(rt - lt, -1, 1);
 
-    // throttle increment from right stick Y (forward = add throttle)
-    const ry = conditionAxis(a[3] ?? 0);
-    let throttleDelta = -ry * dt * 0.8; // push forward (negative) -> increase
-    // LB/RB quick throttle
-    if (b[4] > 0.5) throttleDelta -= dt * 1.5;
-    if (b[5] > 0.5) throttleDelta += dt * 1.5;
+    // throttle: hold A to increase, hold B to decrease
+    let throttleDelta = 0;
+    if ((b[0] ?? 0) > 0.5) throttleDelta += dt * THROTTLE_RATE;
+    if ((b[1] ?? 0) > 0.5) throttleDelta -= dt * THROTTLE_RATE;
 
-    const brake = (b[0] ?? 0); // A
-    // pitch trim from dpad up/down
-    let trimDelta = 0;
-    if ((b[12] ?? 0) > 0.5) trimDelta += dt * 0.3; // up -> nose up trim
-    if ((b[13] ?? 0) > 0.5) trimDelta -= dt * 0.3;
+    const brake = (b[2] ?? 0); // X (hold)
+
+    // right stick = camera look-around (deadzone only; expo not wanted for view)
+    const look = {
+      x: conditionAxis(a[2] ?? 0),
+      y: conditionAxis(a[3] ?? 0),
+    };
 
     // edge actions
-    this._edge(b, 1, 'flaps');  // B
-    this._edge(b, 2, 'reset');  // X
-    this._edge(b, 3, 'view');   // Y
-    this._edge(b, 9, 'pause');  // Start
+    this._edge(b, 12, 'flapsUp');    // D-pad up: retract one notch
+    this._edge(b, 13, 'flapsDown');  // D-pad down: extend one notch
+    this._edge(b, 14, 'parkbrake');  // D-pad left
+    this._edge(b, 15, 'reset');      // D-pad right (FlySim extra)
+    this._edge(b, 3, 'resetview');   // Y
+    this._edge(b, 8, 'view');        // View/Back
+    this._edge(b, 9, 'pause');       // Menu/Start
     this.prevButtons = b;
 
-    return { aileron, elevator, rudder, throttleDelta, brake, trimDelta };
+    return { aileron, elevator, rudder, throttleDelta, brake, trimDelta: 0, look };
   }
 
   _edge(b, i, name) {

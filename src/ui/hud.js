@@ -43,7 +43,7 @@ export class HUD {
     this._readouts(s, ctrl, info);
     if (s.aoaWarn && !s.crashed) this._stallWarn(cx, cy);
 
-    if (s.crashed) this._mask('CRASHED', 'Press R / X to reset to the runway', 'rgba(120,10,10,0.55)');
+    if (s.crashed) this._mask('CRASHED', 'Press R / D-pad Right to reset to the runway', 'rgba(120,10,10,0.55)');
     else if (info.paused) this._mask('PAUSED', 'Press P / Start to resume', 'rgba(0,0,0,0.5)');
     if (this.showHelp) this._help();
   }
@@ -212,6 +212,7 @@ export class HUD {
       `G    ${s.gLoad.toFixed(1)}`,
       `TRIM ${(ctrl.pitchTrim * 100).toFixed(0)}%`,
     ];
+    if (ctrl.parkingBrake) lines.push('PARK BRAKE');
     const x = 24, y0 = this.h - 24 - lines.length * 16;
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(x - 8, y0 - 16, 130, lines.length * 16 + 12);
@@ -275,19 +276,21 @@ export class HUD {
       ['R', 'Reset to runway'],
       ['P', 'Pause   H: this help'],
       ['', ''],
-      ['Xbox Gamepad', ''],
-      ['Left stick', 'Aileron / Elevator (fwd=down)'],
+      ['Xbox Gamepad (MSFS 2020 layout)', ''],
+      ['Left stick', 'Aileron / Elevator (pull=up)'],
+      ['Right stick', 'Look around'],
       ['LT / RT', 'Rudder left / right'],
-      ['Right stick Y', 'Throttle (fwd=more)'],
-      ['LB / RB', 'Throttle quick -/+'],
-      ['A', 'Brakes'],
-      ['B', 'Flaps   X: reset   Y: camera'],
-      ['D-pad U/D', 'Pitch trim   Start: pause'],
+      ['A / B (hold)', 'Throttle increase / decrease'],
+      ['X (hold)', 'Brakes'],
+      ['D-pad U/D', 'Flaps retract / extend'],
+      ['D-pad L', 'Parking brake'],
+      ['Y', 'Reset view   View: camera'],
+      ['Menu', 'Pause   D-pad R: reset'],
     ];
     ctx.font = '14px monospace';
     let y = 96;
     for (const [k, v] of rows) {
-      if (k === 'Keyboard' || k === 'Xbox Gamepad') { ctx.fillStyle = '#ffd86a'; ctx.font = 'bold 15px monospace'; }
+      if (k === 'Keyboard' || k.startsWith('Xbox Gamepad')) { ctx.fillStyle = '#ffd86a'; ctx.font = 'bold 15px monospace'; }
       else { ctx.fillStyle = '#cfe'; ctx.font = '14px monospace'; }
       ctx.fillText(k, 60, y);
       ctx.fillStyle = '#aef'; ctx.fillText(v, 230, y);

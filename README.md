@@ -15,19 +15,23 @@ controls overlay.
 
 ## Controls
 
-### Xbox gamepad (Gamepad API standard mapping)
+### Xbox gamepad — MSFS 2020 default layout
 | Control | Function |
 |---|---|
-| Left stick X / Y | Aileron (roll) / Elevator (forward = nose down) |
+| Left stick X / Y | Aileron (roll) / Elevator (pull back = nose up) |
+| Right stick | Camera look-around (recenters on release) |
 | LT / RT | Rudder left / right |
-| Right stick Y | Throttle (forward = increase, incremental) |
-| LB / RB | Throttle quick down / up |
-| A | Brakes |
-| B | Flaps cycle (0° / 10° / 25°) |
-| X | Reset to runway |
-| Y | Cycle camera |
-| D-pad Up / Down | Pitch trim |
-| Start | Pause |
+| A (hold) / B (hold) | Throttle increase / decrease |
+| X (hold) | Brakes |
+| D-pad Up / Down | Flaps retract / extend one notch (0° / 10° / 25°) |
+| D-pad Left | Parking brake toggle |
+| Y | Reset camera view |
+| View (Back) | Cycle camera |
+| Menu (Start) | Pause |
+| D-pad Right | Reset to runway (FlySim extra; unbound in MSFS) |
+
+Pitch trim is keyboard-only (`[` / `]`); MSFS's default gamepad profile has no
+trim binding either.
 
 Hot-pluggable; HUD shows connection status.
 

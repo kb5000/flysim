@@ -58,11 +58,18 @@ function main() {
     // apply control conditioning / accumulation
     applyControls(ctrl, inp, dt);
 
+    // right stick drives camera look-around (MSFS-style); recenters off-pad
+    camera.setLook(inp?.look?.x ?? 0, inp?.look?.y ?? 0);
+
     // edge actions from both sources
     const actions = [...keyboard.drainActions(), ...gamepad.drainActions()];
     for (const a of actions) {
       if (a === 'flaps') state.flapDetent = (state.flapDetent + 1) % FLAP_DEG.length;
+      else if (a === 'flapsUp') state.flapDetent = Math.max(0, state.flapDetent - 1);
+      else if (a === 'flapsDown') state.flapDetent = Math.min(FLAP_DEG.length - 1, state.flapDetent + 1);
+      else if (a === 'parkbrake') ctrl.parkingBrake = !ctrl.parkingBrake;
       else if (a === 'view') camera.cycle();
+      else if (a === 'resetview') camera.resetView();
       else if (a === 'reset') { resetToRunway(state); prevState = snapshot(state); }
       else if (a === 'pause') paused = !paused;
       else if (a === 'help') hud.showHelp = !hud.showHelp;
@@ -105,7 +112,7 @@ function applyControls(ctrl, inp, dt) {
   ctrl.aileron = inp.aileron;
   ctrl.elevator = inp.elevator;
   ctrl.rudder = inp.rudder;
-  ctrl.brake = inp.brake;
+  ctrl.brake = Math.max(inp.brake, ctrl.parkingBrake ? 1 : 0);
   // throttle is integrated (incremental)
   ctrl.throttle = clamp(ctrl.throttle + inp.throttleDelta, 0, 1);
   ctrl.pitchTrim = clamp(ctrl.pitchTrim + inp.trimDelta, -1, 1);

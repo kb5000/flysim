@@ -42,7 +42,8 @@ export function createControls() {
     elevator: 0,  // -1..1 (pull = nose up positive)
     rudder: 0,    // -1..1 (right yaw positive)
     throttle: 0,  // 0..1 absolute commanded
-    brake: 0,     // 0..1
+    brake: 0,     // 0..1 (held brake, or parking brake when set)
+    parkingBrake: false,
     pitchTrim: 0, // -1..1 elevator trim
     steer: 0,     // -1..1 nosewheel steer (derived from rudder on ground)
   };
