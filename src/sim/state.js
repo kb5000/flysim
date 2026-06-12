@@ -11,8 +11,9 @@ export const RUNWAY = {
   width: 30,
 };
 
-export function createState() {
+export function createState(aircraftType = 'fixedwing') {
   return {
+    aircraftType,
     // kinematics (world ENU: +X east, +Y north, +Z up)
     pos: [0, 30, 0],          // start near runway threshold
     vel: [0, 0, 0],           // world-frame velocity m/s
@@ -51,6 +52,7 @@ export function createControls() {
 
 // place aircraft at runway threshold, engine idle, ready for takeoff
 export function resetToRunway(s) {
+  s.aircraftType = 'fixedwing';
   // CG height above ground = gear z (0.85). Place pos.z so wheels sit on surface.
   s.pos = [0, 40, C172.gear[1].pos[2]];
   s.vel = [0, 0, 0];
@@ -63,4 +65,17 @@ export function resetToRunway(s) {
   s.onGround = true;
   s.crashed = false;
   s.alpha = 0; s.beta = 0; s.V = 0; s.ias = 0; s.gLoad = 1; s.aoaWarn = false;
+  s.altitude = s.pos[2]; s.vspeed = 0; s.agl = s.pos[2];
+  s.nWheelOnGround = 3;
+}
+
+export function resetControls(ctrl) {
+  ctrl.aileron = 0;
+  ctrl.elevator = 0;
+  ctrl.rudder = 0;
+  ctrl.throttle = 0;
+  ctrl.brake = 0;
+  ctrl.parkingBrake = false;
+  ctrl.pitchTrim = 0;
+  ctrl.steer = 0;
 }

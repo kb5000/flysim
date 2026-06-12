@@ -8,6 +8,7 @@ import { Terrain } from '../world/terrain.js';
 import { Runway } from '../world/runway.js';
 import { Sky } from '../world/sky.js';
 import { AircraftModel } from './aircraft-mesh.js';
+import { QuadModel } from './quad-mesh.js';
 
 const VS = `#version 300 es
 layout(location=0) in vec3 aPos;
@@ -59,6 +60,7 @@ export class Scene {
     this.runway = new Runway(gl);
     this.sky = new Sky(gl);
     this.aircraft = new AircraftModel(gl);
+    this.quad = new QuadModel(gl);
 
     this.sunDir = vec3.normalize([0.4, 0.3, 0.85]);
     this.palette = {
@@ -119,7 +121,8 @@ export class Scene {
     };
     // don't draw the aircraft in cockpit view (we're inside it)
     if (camera.mode !== 1) {
-      this.aircraft.draw(drawPart, ctrl, propAngle);
+      const model = s.full?.aircraftType === 'quad' ? this.quad : this.aircraft;
+      model.draw(drawPart, ctrl, propAngle);
     }
   }
 

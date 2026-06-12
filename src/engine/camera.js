@@ -38,6 +38,7 @@ export class Camera {
   // s: aircraft state (interpolated pos/q). dt for smoothing.
   update(s, dt) {
     const pos = s.pos;
+    const isQuad = s.full?.aircraftType === 'quad';
     const fwd = quat.rotate(s.q, [1, 0, 0]);   // nose in world
     const up = quat.rotate(s.q, [0, 0, -1]);   // body up (-Z down) in world
     const right = quat.rotate(s.q, [0, 1, 0]);
@@ -84,13 +85,19 @@ export class Camera {
       -(headingDir[0] * sy + headingDir[1] * cy),
       0,
     ];
+    const distance = isQuad ? 7 : 18;
+    const height = isQuad ? 2.5 : 6.5;
     const desiredEye = [
-      pos[0] + behind[0] * 18,
-      pos[1] + behind[1] * 18,
-      pos[2] + 6.5 + this.lookPitch * 12,
+      pos[0] + behind[0] * distance,
+      pos[1] + behind[1] * distance,
+      pos[2] + height + this.lookPitch * (isQuad ? 5 : 12),
     ];
     this.smoothEye = vec3.lerp(this.smoothEye, desiredEye, clamp(dt * 6, 0, 1));
-    this.smoothTarget = vec3.lerp(this.smoothTarget, vec3.addScaled(pos, fwd, 4), clamp(dt * 8, 0, 1));
+    this.smoothTarget = vec3.lerp(
+      this.smoothTarget,
+      vec3.addScaled(pos, fwd, isQuad ? 1 : 4),
+      clamp(dt * 8, 0, 1)
+    );
     mat4.lookAt(this.view, this.smoothEye, this.smoothTarget, [0, 0, 1]);
     this.eye = this.smoothEye;
   }

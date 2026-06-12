@@ -5,8 +5,11 @@
 import { initGL } from './engine/gl.js';
 import { Camera } from './engine/camera.js';
 import { Scene } from './render/scene.js';
-import { createState, createControls, resetToRunway } from './sim/state.js';
+import {
+  createState, createControls, resetControls, resetToRunway,
+} from './sim/state.js';
 import { stepPhysics, FIXED_DT } from './sim/physics.js';
+import { resetQuad, stepQuad } from './sim/quad.js';
 import { groundHeight } from './world/terrain.js';
 import { Keyboard } from './input/keyboard.js';
 import { Gamepad } from './input/gamepad.js';
@@ -25,6 +28,7 @@ function main() {
   const camera = new Camera();
   const hud = new HUD(hudCanvas);
   const keyboard = new Keyboard();
+  const aircraftSelect = document.getElementById('aircraft-type');
   const inputSelect = document.getElementById('input-device');
   const refreshInput = document.getElementById('refresh-input');
   const inputStatus = document.getElementById('input-status');
@@ -47,6 +51,13 @@ function main() {
   const state = createState();
   resetToRunway(state);
   const ctrl = createControls();
+  aircraftSelect.addEventListener('change', () => {
+    resetControls(ctrl);
+    resetAircraft(state, aircraftSelect.value);
+    prevState = snapshot(state);
+    acc = 0;
+    camera.resetView();
+  });
 
   let prevState = snapshot(state);
   let paused = false;
@@ -85,13 +96,20 @@ function main() {
     const gamepadActions = gamepad.drainActions();
     const actions = inputSelect.value === 'keyboard' ? keyboardActions : gamepadActions;
     for (const a of actions) {
-      if (a === 'flaps') state.flapDetent = (state.flapDetent + 1) % FLAP_DEG.length;
-      else if (a === 'flapsUp') state.flapDetent = Math.max(0, state.flapDetent - 1);
-      else if (a === 'flapsDown') state.flapDetent = Math.min(FLAP_DEG.length - 1, state.flapDetent + 1);
+      if (a === 'flaps' && state.aircraftType === 'fixedwing') {
+        state.flapDetent = (state.flapDetent + 1) % FLAP_DEG.length;
+      } else if (a === 'flapsUp' && state.aircraftType === 'fixedwing') {
+        state.flapDetent = Math.max(0, state.flapDetent - 1);
+      } else if (a === 'flapsDown' && state.aircraftType === 'fixedwing') {
+        state.flapDetent = Math.min(FLAP_DEG.length - 1, state.flapDetent + 1);
+      }
       else if (a === 'parkbrake') ctrl.parkingBrake = !ctrl.parkingBrake;
       else if (a === 'view') camera.cycle();
       else if (a === 'resetview') camera.resetView();
-      else if (a === 'reset') { resetToRunway(state); prevState = snapshot(state); }
+      else if (a === 'reset') {
+        resetAircraft(state, state.aircraftType);
+        prevState = snapshot(state);
+      }
       else if (a === 'pause') paused = !paused;
       else if (a === 'help') hud.showHelp = !hud.showHelp;
     }
@@ -102,7 +120,11 @@ function main() {
       let steps = 0;
       while (acc >= FIXED_DT && steps < 8) {
         prevState = snapshot(state);
-        stepPhysics(state, ctrl, FIXED_DT, groundHeight);
+        if (state.aircraftType === 'quad') {
+          stepQuad(state, ctrl, FIXED_DT, groundHeight);
+        } else {
+          stepPhysics(state, ctrl, FIXED_DT, groundHeight);
+        }
         acc -= FIXED_DT; steps++;
       }
     } else {
@@ -113,8 +135,11 @@ function main() {
     const alpha = clamp(acc / FIXED_DT, 0, 1);
     const rs = interpolate(prevState, state, alpha);
 
-    // prop spin from spooled thrust
-    propAngle += dt * (8 + state.thrustState * 90);
+    // Fixed-wing propeller idles; quad rotors stop at zero collective.
+    const propSpeed = state.aircraftType === 'quad'
+      ? state.thrustState * 180
+      : 8 + state.thrustState * 90;
+    propAngle += dt * propSpeed;
 
     // ---- render ----
     camera.update(rs, dt);
@@ -129,6 +154,11 @@ function main() {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+}
+
+function resetAircraft(state, aircraftType) {
+  if (aircraftType === 'quad') resetQuad(state, groundHeight);
+  else resetToRunway(state);
 }
 
 function updateInputOptions(select, devices) {

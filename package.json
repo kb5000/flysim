@@ -1,6 +1,6 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node test/physics-smoke.mjs && node test/gamepad-smoke.mjs && node test/terrain-smoke.mjs"
+    "test": "node test/physics-smoke.mjs && node test/quad-smoke.mjs && node test/gamepad-smoke.mjs && node test/terrain-smoke.mjs"
   }
 }

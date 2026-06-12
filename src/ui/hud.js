@@ -4,10 +4,15 @@
 // crash/pause masks plus a help page.
 
 import { quat } from '../math.js';
+import { RUNWAY } from '../sim/state.js';
+import { groundHeight } from '../world/terrain.js';
 
 const MS_TO_KT = 1.94384;
 const M_TO_FT = 3.28084;
 const FPM = 196.850; // m/s -> ft/min
+const MAP_SIZE = 180;
+const MAP_SPAN = 5000;
+const MAP_GRID = 45;
 
 export class HUD {
   constructor(canvas) {
@@ -15,6 +20,13 @@ export class HUD {
     this.ctx = canvas.getContext('2d');
     this.showHelp = false;
     this.blink = 0;
+    this.mapCanvas = document.createElement('canvas');
+    this.mapCanvas.width = MAP_GRID;
+    this.mapCanvas.height = MAP_GRID;
+    this.mapCenter = [Infinity, Infinity];
+    this.mapTrail = [];
+    this.mapTrailTimer = 0;
+    this.lastMapType = '';
   }
 
   resize() {
@@ -40,6 +52,7 @@ export class HUD {
     this._speedTape(cx, cy, s.ias * MS_TO_KT);
     this._altTape(cx, cy, s.altitude * M_TO_FT);
     this._headingTape(cx, heading);
+    this._minimap(s, heading, dt);
     this._readouts(s, ctrl, info);
     if (s.aoaWarn && !s.crashed) this._stallWarn(cx, cy);
 
@@ -201,17 +214,135 @@ export class HUD {
     ctx.fillText(((deg % 360 + 360) % 360).toFixed(0).padStart(3, '0'), cx, y + 11);
   }
 
+  _minimap(s, heading, dt) {
+    const x = 18, y = 18, size = MAP_SIZE;
+    const snap = 500;
+    const centerX = Math.round(s.pos[0] / snap) * snap;
+    const centerY = Math.round(s.pos[1] / snap) * snap;
+    if (centerX !== this.mapCenter[0] || centerY !== this.mapCenter[1]) {
+      this.mapCenter = [centerX, centerY];
+      this._rebuildMap();
+    }
+
+    if (s.aircraftType !== this.lastMapType) {
+      this.mapTrail = [];
+      this.lastMapType = s.aircraftType;
+    }
+    this.mapTrailTimer += dt;
+    let last = this.mapTrail[this.mapTrail.length - 1];
+    if (last && Math.hypot(s.pos[0] - last[0], s.pos[1] - last[1]) > MAP_SPAN * 0.4) {
+      this.mapTrail = [];
+      last = null;
+    }
+    if (this.mapTrailTimer >= 0.25
+      || !last
+      || Math.hypot(s.pos[0] - last[0], s.pos[1] - last[1]) > 50) {
+      this.mapTrail.push([s.pos[0], s.pos[1]]);
+      if (this.mapTrail.length > 160) this.mapTrail.shift();
+      this.mapTrailTimer = 0;
+    }
+
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(3,10,13,0.82)';
+    ctx.fillRect(x - 4, y - 4, size + 8, size + 25);
+    ctx.drawImage(this.mapCanvas, x, y, size, size);
+    ctx.beginPath();
+    ctx.rect(x, y, size, size);
+    ctx.clip();
+
+    const toMap = (wx, wy) => [
+      x + size * (0.5 + (wx - this.mapCenter[0]) / MAP_SPAN),
+      y + size * (0.5 - (wy - this.mapCenter[1]) / MAP_SPAN),
+    ];
+
+    // Runway.
+    const [r0x, r0y] = toMap(RUNWAY.origin[0], RUNWAY.origin[1]);
+    const [r1x, r1y] = toMap(RUNWAY.origin[0], RUNWAY.origin[1] + RUNWAY.length);
+    ctx.strokeStyle = 'rgba(235,235,225,0.9)';
+    ctx.lineWidth = Math.max(2, RUNWAY.width / MAP_SPAN * size);
+    ctx.beginPath(); ctx.moveTo(r0x, r0y); ctx.lineTo(r1x, r1y); ctx.stroke();
+
+    // Recent ground track.
+    if (this.mapTrail.length > 1) {
+      ctx.strokeStyle = 'rgba(90,220,255,0.75)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < this.mapTrail.length; i++) {
+        const [px, py] = toMap(this.mapTrail[i][0], this.mapTrail[i][1]);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // Aircraft marker, heading 0 points north/up.
+    const [px, py] = toMap(s.pos[0], s.pos[1]);
+    ctx.translate(px, py);
+    ctx.rotate(heading);
+    ctx.fillStyle = s.aircraftType === 'quad' ? '#65eaff' : '#ffd84f';
+    ctx.strokeStyle = '#091014';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -9);
+    ctx.lineTo(6, 7);
+    ctx.lineTo(0, 4);
+    ctx.lineTo(-6, 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(150,255,185,0.8)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 0.5, y - 0.5, size + 1, size + 1);
+    ctx.fillStyle = 'rgba(210,255,225,0.9)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('N', x + size / 2 - 3, y + 11);
+    ctx.fillText('MAP  5 km', x + 4, y + size + 15);
+  }
+
+  _rebuildMap() {
+    const ctx = this.mapCanvas.getContext('2d');
+    const image = ctx.createImageData(MAP_GRID, MAP_GRID);
+    const data = image.data;
+    for (let py = 0; py < MAP_GRID; py++) {
+      for (let px = 0; px < MAP_GRID; px++) {
+        const wx = this.mapCenter[0] + ((px + 0.5) / MAP_GRID - 0.5) * MAP_SPAN;
+        const wy = this.mapCenter[1] + (0.5 - (py + 0.5) / MAP_GRID) * MAP_SPAN;
+        const h = groundHeight(wx, wy);
+        const color = mapTerrainColor(h);
+        const i = (py * MAP_GRID + px) * 4;
+        data[i] = color[0];
+        data[i + 1] = color[1];
+        data[i + 2] = color[2];
+        data[i + 3] = 235;
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
   _readouts(s, ctrl, info) {
     const ctx = this.ctx;
     ctx.font = '12px monospace'; ctx.textAlign = 'left';
-    const lines = [
-      `THR  ${(s.throttle * 100).toFixed(0)}%`,
-      `FLAP ${[0, 10, 25][s.flapDetent]}°`,
-      `VS   ${(s.vspeed * FPM).toFixed(0)} fpm`,
-      `AOA  ${(s.alpha * 180 / Math.PI).toFixed(1)}°`,
-      `G    ${s.gLoad.toFixed(1)}`,
-      `TRIM ${(ctrl.pitchTrim * 100).toFixed(0)}%`,
-    ];
+    const lines = s.aircraftType === 'quad'
+      ? [
+          'MODEL QUAD',
+          `THR   ${(s.throttle * 100).toFixed(0)}%`,
+          `VS    ${(s.vspeed * FPM).toFixed(0)} fpm`,
+          `SPEED ${(s.V * MS_TO_KT).toFixed(0)} kt`,
+          `LOAD  ${s.gLoad.toFixed(1)}`,
+        ]
+      : [
+          'MODEL FIXED',
+          `THR  ${(s.throttle * 100).toFixed(0)}%`,
+          `FLAP ${[0, 10, 25][s.flapDetent]}°`,
+          `VS   ${(s.vspeed * FPM).toFixed(0)} fpm`,
+          `AOA  ${(s.alpha * 180 / Math.PI).toFixed(1)}°`,
+          `G    ${s.gLoad.toFixed(1)}`,
+          `TRIM ${(ctrl.pitchTrim * 100).toFixed(0)}%`,
+        ];
     if (ctrl.parkingBrake) lines.push('PARK BRAKE');
     const x = 24, y0 = this.h - 24 - lines.length * 16;
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -224,7 +355,7 @@ export class HUD {
     const rx = this.w - 24;
     const stat = [
       info.gamepad ? `PAD: ${shortName(info.inputName)}` : 'INPUT: keyboard',
-      s.onGround ? `GND (${s.nWheelOnGround}/3)` : 'AIRBORNE',
+      s.onGround ? `GND (${s.nWheelOnGround}/${s.aircraftType === 'quad' ? 4 : 3})` : 'AIRBORNE',
       `AGL ${(s.agl * M_TO_FT).toFixed(0)} ft`,
     ];
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -303,4 +434,12 @@ export class HUD {
 
 function shortName(name) {
   return name.length > 24 ? `${name.slice(0, 21)}...` : name;
+}
+
+function mapTerrainColor(height) {
+  if (height < 20) return [48, 79, 45];
+  if (height < 100) return [66, 91, 48];
+  if (height < 200) return [91, 83, 61];
+  if (height < 280) return [116, 105, 91];
+  return [196, 202, 205];
 }

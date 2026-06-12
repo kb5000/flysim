@@ -92,9 +92,9 @@ export class AircraftModel {
     const de = ctrl.elevator * (22 * Math.PI / 180);
     drawPart(this.elevator, hinge(this.elevatorHinge, [0, 1, 0], -de));
 
-    // rudder: positive rudder (right yaw) => trailing edge left
+    // Right rudder moves the trailing edge right, pushing the tail left.
     const dr = ctrl.rudder * (24 * Math.PI / 180);
-    drawPart(this.rudder, hinge(this.rudderHinge, [0, 0, 1], dr));
+    drawPart(this.rudder, hinge(this.rudderHinge, [0, 0, 1], -dr));
 
     // +Y rotation moves an aft surface down. Right roll needs right up, left down.
     const da = ctrl.aileron * (20 * Math.PI / 180);

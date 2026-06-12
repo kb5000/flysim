@@ -52,13 +52,18 @@ export class AudioSys {
     if (!this.started || !this.ctx) return;
     this._t += dt;
     const t = this.ctx.currentTime;
-    const rpm = 0.25 + 0.75 * s.thrustState; // idle floor
-    const base = 60 + rpm * 110;
+    const quad = s.aircraftType === 'quad';
+    const rpm = quad ? s.thrustState : 0.25 + 0.75 * s.thrustState;
+    const base = quad ? 110 + rpm * 230 : 60 + rpm * 110;
     this.osc1.frequency.setTargetAtTime(base, t, 0.05);
     this.osc2.frequency.setTargetAtTime(base * 1.5, t, 0.05);
     this.subOsc.frequency.setTargetAtTime(base * 0.5, t, 0.05);
-    this.lp.frequency.setTargetAtTime(350 + rpm * 850, t, 0.08);
-    const vol = s.crashed ? 0 : (0.07 + 0.14 * rpm);
+    this.lp.frequency.setTargetAtTime(
+      quad ? 650 + rpm * 1400 : 350 + rpm * 850,
+      t,
+      0.08
+    );
+    const vol = s.crashed ? 0 : (quad ? 0.15 * rpm : 0.07 + 0.14 * rpm);
     this.engGain.gain.setTargetAtTime(vol, t, 0.08);
 
     // stall beep: pulse on/off
