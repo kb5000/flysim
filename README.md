@@ -23,6 +23,7 @@ controls overlay.
 | LT / RT | Rudder left / right |
 | A (hold) / B (hold) | Throttle increase / decrease |
 | X (hold) | Brakes |
+| RB (hold) + left stick Y | Pitch trim (pull back = nose-up trim) |
 | D-pad Up / Down | Flaps retract / extend one notch (0° / 10° / 25°) |
 | D-pad Left | Parking brake toggle |
 | Y | Reset camera view |
@@ -30,8 +31,8 @@ controls overlay.
 | Menu (Start) | Pause |
 | D-pad Right | Reset to runway (FlySim extra; unbound in MSFS) |
 
-Pitch trim is keyboard-only (`[` / `]`); MSFS's default gamepad profile has no
-trim binding either.
+Keyboard `[` / `]` also trims. While RB is held the left stick trims instead of
+deflecting the primary controls, matching MSFS's modifier behavior.
 
 Hot-pluggable; HUD shows connection status.
 

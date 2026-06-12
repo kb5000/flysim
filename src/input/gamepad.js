@@ -7,6 +7,7 @@
 //   LT / RT      = rudder left / right
 //   A / B (hold) = throttle increase / decrease
 //   X (hold)     = brakes
+//   RB (hold)    = modifier: left stick Y becomes pitch trim (pull = nose-up trim)
 //   D-pad Up/Dn  = flaps retract / extend one notch
 //   D-pad Left   = parking brake toggle
 //   Y            = reset camera view
@@ -58,10 +59,16 @@ export class Gamepad {
     this.connected = true;
     const a = p.axes, b = p.buttons.map((x) => x.value);
 
-    const aileron = conditionAxis(a[0] ?? 0);
+    // RB is a modifier (as in MSFS): while held, the left stick trims instead
+    // of deflecting the primary controls.
+    const rbHeld = (b[5] ?? 0) > 0.5;
+
     // LY: pushing forward gives negative; we want forward = nose down = elevator negative.
     // Pull back (+1) -> +1 (nose up). Matches MSFS (pull back to climb).
-    const elevator = conditionAxis(a[1] ?? 0);
+    const aileron = rbHeld ? 0 : conditionAxis(a[0] ?? 0);
+    const elevator = rbHeld ? 0 : conditionAxis(a[1] ?? 0);
+    // pull back with RB held = nose-up trim, rate scaled by deflection
+    const trimDelta = rbHeld ? conditionAxis(a[1] ?? 0) * dt * 0.3 : 0;
 
     // rudder from triggers LT(6)/RT(7): right positive
     const lt = b[6] ?? 0, rt = b[7] ?? 0;
@@ -90,7 +97,7 @@ export class Gamepad {
     this._edge(b, 9, 'pause');       // Menu/Start
     this.prevButtons = b;
 
-    return { aileron, elevator, rudder, throttleDelta, brake, trimDelta: 0, look };
+    return { aileron, elevator, rudder, throttleDelta, brake, trimDelta, look };
   }
 
   _edge(b, i, name) {

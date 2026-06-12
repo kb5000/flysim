@@ -282,6 +282,7 @@ export class HUD {
       ['LT / RT', 'Rudder left / right'],
       ['A / B (hold)', 'Throttle increase / decrease'],
       ['X (hold)', 'Brakes'],
+      ['RB + L-stick', 'Pitch trim (pull = nose up)'],
       ['D-pad U/D', 'Flaps retract / extend'],
       ['D-pad L', 'Parking brake'],
       ['Y', 'Reset view   View: camera'],
