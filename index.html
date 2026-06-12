@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>FlySim — WebGL Flight Simulator</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="gl"></canvas>
+    <canvas id="hud"></canvas>
+    <div id="boot">
+      <h1>FlySim</h1>
+      <p>Procedural WebGL2 fixed-wing flight simulator</p>
+      <p class="hint">Click or press any key to start &middot; press <b>H</b> for controls</p>
+      <p class="hint">Xbox gamepad supported &middot; keyboard fallback (arrows + W/S)</p>
+    </div>
+  </div>
+  <noscript>This game requires JavaScript and WebGL2.</noscript>
+  <script type="module" src="src/main.js"></script>
+  <script type="module">
+    // hide the boot splash on first interaction
+    const boot = document.getElementById('boot');
+    const hide = () => boot && (boot.style.display = 'none');
+    window.addEventListener('keydown', hide, { once: true });
+    window.addEventListener('pointerdown', hide, { once: true });
+    setTimeout(hide, 6000);
+  </script>
+</body>
+</html>
