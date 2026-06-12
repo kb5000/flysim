@@ -7,7 +7,7 @@
 //   LT / RT      = rudder left / right
 //   A / B (hold) = throttle increase / decrease
 //   X (hold)     = brakes
-//   RB (hold)    = modifier: left stick Y becomes pitch trim (pull = nose-up trim)
+//   RB (hold)    = modifier: right stick Y becomes pitch trim (pull = nose-up trim)
 //   D-pad Up/Dn  = flaps retract / extend one notch
 //   D-pad Left   = parking brake toggle
 //   Y            = reset camera view
@@ -23,33 +23,140 @@ import { clamp } from '../math.js';
 
 const THROTTLE_RATE = 0.5; // full sweep in 2 s, like MSFS's gradual A/B throttle
 
+export function connectedGamepads(pads) {
+  return Array.from(pads || []).filter((p) => p != null && p.connected !== false);
+}
+
+export function mapStandardGamepad(axes, buttonValues, dt) {
+  const a = axes, b = buttonValues;
+  const rbHeld = (b[5] ?? 0) > 0.5;
+  const aileron = conditionAxis(a[0] ?? 0);
+  const elevator = conditionAxis(a[1] ?? 0);
+  const trimDelta = rbHeld ? conditionAxis(a[3] ?? 0) * dt * 0.3 : 0;
+
+  const lt = b[6] ?? 0, rt = b[7] ?? 0;
+  const rudder = clamp(rt - lt, -1, 1);
+
+  let throttleDelta = 0;
+  if ((b[0] ?? 0) > 0.5) throttleDelta += dt * THROTTLE_RATE;
+  if ((b[1] ?? 0) > 0.5) throttleDelta -= dt * THROTTLE_RATE;
+
+  return {
+    aileron,
+    elevator,
+    rudder,
+    throttleDelta,
+    brake: b[2] ?? 0,
+    trimDelta,
+    look: {
+      x: rbHeld ? 0 : conditionAxis(a[2] ?? 0),
+      y: rbHeld ? 0 : conditionAxis(a[3] ?? 0),
+    },
+  };
+}
+
 export class Gamepad {
-  constructor() {
+  constructor(onDevicesChanged = null, onStatusChanged = null) {
     this.index = null;
     this.connected = false;
     this.id = '';
     this.prevButtons = [];
     this.actions = [];
+    this.onDevicesChanged = onDevicesChanged;
+    this.onStatusChanged = onStatusChanged;
+    this._signature = '';
+    this.knownPads = new Map();
+    this.lastError = '';
+    this.eventSeen = false;
     window.addEventListener('gamepadconnected', (e) => {
-      this.index = e.gamepad.index;
-      this.connected = true;
-      this.id = e.gamepad.id;
+      this.eventSeen = true;
+      this.knownPads.set(e.gamepad.index, {
+        index: e.gamepad.index,
+        id: e.gamepad.id,
+      });
+      this._notifyDevices();
+      // Chromium can update navigator.getGamepads() one frame after the event.
+      requestAnimationFrame(() => this.refreshDevices(true));
     });
     window.addEventListener('gamepaddisconnected', (e) => {
+      this.knownPads.delete(e.gamepad.index);
       if (e.gamepad.index === this.index) {
         this.connected = false; this.index = null;
+        this.id = '';
       }
+      this._notifyDevices();
     });
   }
 
-  _pad() {
-    if (this.index == null) {
-      // attempt to discover an already-connected pad
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      for (const p of pads) if (p) { this.index = p.index; this.connected = true; this.id = p.id; break; }
+  devices() {
+    const getPads = navigator.getGamepads?.bind(navigator)
+      || navigator.webkitGetGamepads?.bind(navigator);
+    if (!getPads) {
+      this.lastError = 'This browser does not provide the Gamepad API.';
+      return [];
     }
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    return (this.index != null) ? pads[this.index] : null;
+    let pads;
+    try {
+      pads = getPads() || [];
+      this.lastError = '';
+    } catch (error) {
+      this.lastError = `${error.name || 'Gamepad error'}: ${error.message || error}`;
+      return [];
+    }
+    for (const p of connectedGamepads(pads)) {
+      this.knownPads.set(p.index, { index: p.index, id: p.id });
+    }
+    return [...this.knownPads.values()].sort((a, b) => a.index - b.index);
+  }
+
+  select(index) {
+    this.index = Number.isInteger(index) ? index : null;
+    this.connected = false;
+    this.id = '';
+    this.prevButtons = [];
+    this.actions = [];
+  }
+
+  refreshDevices(force = false) {
+    const devices = this.devices();
+    const signature = devices.map((p) => `${p.index}:${p.id}`).join('|');
+    if (force || signature !== this._signature) {
+      this._signature = signature;
+      this.onDevicesChanged?.(devices);
+    }
+    this.onStatusChanged?.(this.status(devices));
+    return devices;
+  }
+
+  status(devices = this.devices()) {
+    const policy = document.permissionsPolicy || document.featurePolicy;
+    let allowed = true;
+    try {
+      if (policy?.allowsFeature) allowed = policy.allowsFeature('gamepad');
+    } catch {
+      // Some browsers expose the policy object without the gamepad feature.
+    }
+    if (this.lastError) return this.lastError;
+    if (!allowed) return 'Gamepad blocked by this embedded page. Open the localhost URL in a normal browser tab.';
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      return `Insecure page (${location.protocol}). Open through http://localhost, not file:// or a LAN IP.`;
+    }
+    if (devices.length > 0) return `${devices.length} gamepad(s) detected. Select one above.`;
+    const context = window.top === window.self ? 'top-level page' : 'embedded preview';
+    return `API available, 0 devices (${context}). Focus this page, press a gamepad button, then Refresh.`;
+  }
+
+  _notifyDevices() {
+    this._signature = '';
+    this.refreshDevices();
+  }
+
+  _pad() {
+    if (this.index == null) return null;
+    const getPads = navigator.getGamepads?.bind(navigator)
+      || navigator.webkitGetGamepads?.bind(navigator);
+    const pads = getPads ? getPads() : [];
+    return pads[this.index] || null;
   }
 
   // returns null if no pad, else same control contributions as keyboard.sample
@@ -57,35 +164,9 @@ export class Gamepad {
     const p = this._pad();
     if (!p) { this.connected = false; return null; }
     this.connected = true;
+    this.id = p.id;
     const a = p.axes, b = p.buttons.map((x) => x.value);
-
-    // RB is a modifier (as in MSFS): while held, the left stick trims instead
-    // of deflecting the primary controls.
-    const rbHeld = (b[5] ?? 0) > 0.5;
-
-    // LY: pushing forward gives negative; we want forward = nose down = elevator negative.
-    // Pull back (+1) -> +1 (nose up). Matches MSFS (pull back to climb).
-    const aileron = rbHeld ? 0 : conditionAxis(a[0] ?? 0);
-    const elevator = rbHeld ? 0 : conditionAxis(a[1] ?? 0);
-    // pull back with RB held = nose-up trim, rate scaled by deflection
-    const trimDelta = rbHeld ? conditionAxis(a[1] ?? 0) * dt * 0.3 : 0;
-
-    // rudder from triggers LT(6)/RT(7): right positive
-    const lt = b[6] ?? 0, rt = b[7] ?? 0;
-    const rudder = clamp(rt - lt, -1, 1);
-
-    // throttle: hold A to increase, hold B to decrease
-    let throttleDelta = 0;
-    if ((b[0] ?? 0) > 0.5) throttleDelta += dt * THROTTLE_RATE;
-    if ((b[1] ?? 0) > 0.5) throttleDelta -= dt * THROTTLE_RATE;
-
-    const brake = (b[2] ?? 0); // X (hold)
-
-    // right stick = camera look-around (deadzone only; expo not wanted for view)
-    const look = {
-      x: conditionAxis(a[2] ?? 0),
-      y: conditionAxis(a[3] ?? 0),
-    };
+    const mapped = mapStandardGamepad(a, b, dt);
 
     // edge actions
     this._edge(b, 12, 'flapsUp');    // D-pad up: retract one notch
@@ -97,7 +178,7 @@ export class Gamepad {
     this._edge(b, 9, 'pause');       // Menu/Start
     this.prevButtons = b;
 
-    return { aileron, elevator, rudder, throttleDelta, brake, trimDelta, look };
+    return mapped;
   }
 
   _edge(b, i, name) {

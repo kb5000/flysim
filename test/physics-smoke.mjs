@@ -6,6 +6,7 @@ import { stepPhysics, FIXED_DT } from '../src/sim/physics.js';
 import { aero } from '../src/sim/aero.js';
 import { density } from '../src/sim/atmosphere.js';
 import { C172 } from '../src/sim/aircraft-c172.js';
+import { thrust } from '../src/sim/propulsion.js';
 import { quat } from '../src/math.js';
 
 const MS_TO_KT = 1.94384;
@@ -45,7 +46,26 @@ const ground = () => 0;
 })();
 
 // ---------------------------------------------------------------------------
-// Test 2: trimmed level flight does not diverge over 60 s.
+// Test 2: cruise-speed excess power supports a useful climb rate.
+// ---------------------------------------------------------------------------
+(function climbPerformance() {
+  const V = 50;
+  const rho = density(0);
+  const weight = C172.mass * 9.80665;
+  const CL = weight / (0.5 * rho * V * V * C172.S);
+  const alpha = (CL - C172.CL0) / C172.CLa;
+  const vBody = [V * Math.cos(alpha), 0, V * Math.sin(alpha)];
+  const drag = aero(vBody, [0, 0, 0], rho, createControls(), 0).CD
+    * 0.5 * rho * V * V * C172.S;
+  const s = { thrustState: 1 };
+  const climbRate = (thrust(s, V) - drag) * V / weight;
+  check('climb: full power has useful cruise-speed excess power',
+    climbRate > 2.5,
+    `estimated ${climbRate.toFixed(1)}m/s (${(climbRate * 196.85).toFixed(0)}fpm)`);
+})();
+
+// ---------------------------------------------------------------------------
+// Test 3: trimmed level flight does not diverge over 60 s.
 // We find an approximate trim, then check altitude/speed stay bounded.
 // ---------------------------------------------------------------------------
 (function trimmedCruise() {
@@ -100,7 +120,7 @@ const ground = () => 0;
 })();
 
 // ---------------------------------------------------------------------------
-// Test 3: lift drops past stall — CL at high alpha < CL at moderate alpha.
+// Test 4: lift drops past stall — CL at high alpha < CL at moderate alpha.
 // ---------------------------------------------------------------------------
 (function stall() {
   const rho = density(0);
@@ -120,7 +140,7 @@ const ground = () => 0;
 })();
 
 // ---------------------------------------------------------------------------
-// Test 4: aileron input rolls the aircraft and produces adverse yaw.
+// Test 5: aileron input rolls the aircraft and produces adverse yaw.
 // Right aileron (positive) -> positive roll rate p; adverse yaw -> negative-ish
 // yaw acceleration relative to no-aileron baseline.
 // ---------------------------------------------------------------------------
@@ -145,6 +165,24 @@ const ground = () => 0;
   check('aileron: produces roll rate', rolled, `p=${right.p.toFixed(3)} rad/s`);
   check('aileron: shows adverse yaw', adverse,
     `r(aileron)=${right.r.toFixed(4)} < r(none)=${none.r.toFixed(4)}`);
+})();
+
+// ---------------------------------------------------------------------------
+// Test 6: positive rudder command yaws right (positive body yaw rate).
+// ---------------------------------------------------------------------------
+(function rudderDirection() {
+  const s = createState();
+  s.pos = [0, 0, 500];
+  s.q = quat.fromHeadingPitchRoll(0, 0, 0);
+  s.vel = [0, 50, 0];
+  s.onGround = false;
+  s.throttle = 0.6; s.thrustState = 0.6;
+  const ctrl = createControls();
+  ctrl.throttle = 0.6; ctrl.rudder = 0.7;
+  for (let k = 0; k < 0.4 / FIXED_DT; k++) stepPhysics(s, ctrl, FIXED_DT, ground);
+  check('rudder: positive input yaws right without excessive response',
+    s.omega[2] > 0.02 && s.omega[2] < 0.4,
+    `r=${s.omega[2].toFixed(3)} rad/s`);
 })();
 
 console.log(`\n${failures === 0 ? 'ALL TESTS PASSED' : failures + ' TEST(S) FAILED'}`);

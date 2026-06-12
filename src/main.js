@@ -25,8 +25,24 @@ function main() {
   const camera = new Camera();
   const hud = new HUD(hudCanvas);
   const keyboard = new Keyboard();
-  const gamepad = new Gamepad();
+  const inputSelect = document.getElementById('input-device');
+  const refreshInput = document.getElementById('refresh-input');
+  const inputStatus = document.getElementById('input-status');
+  const gamepad = new Gamepad(
+    (devices) => updateInputOptions(inputSelect, devices),
+    (status) => { inputStatus.textContent = status; }
+  );
   const audio = new AudioSys();
+  inputSelect.addEventListener('change', () => {
+    const value = inputSelect.value;
+    gamepad.select(value === 'keyboard' ? null : Number(value));
+  });
+  refreshInput.addEventListener('click', () => gamepad.refreshDevices(true));
+  window.addEventListener('focus', () => gamepad.refreshDevices(true));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) gamepad.refreshDevices(true);
+  });
+  gamepad.refreshDevices(true);
 
   const state = createState();
   resetToRunway(state);
@@ -50,10 +66,11 @@ function main() {
     if (dt > 0.25) dt = 0.25; // avoid spiral after tab switch
 
     // ---- input ----
-    const padSample = gamepad.sample(dt);
+    gamepad.refreshDevices();
+    const padSample = inputSelect.value === 'keyboard' ? null : gamepad.sample(dt);
     const kbSample = keyboard.sample(dt);
     const usingPad = !!padSample && gamepad.connected;
-    const inp = padSample || kbSample;
+    const inp = inputSelect.value === 'keyboard' ? kbSample : padSample;
 
     // apply control conditioning / accumulation
     applyControls(ctrl, inp, dt);
@@ -62,7 +79,11 @@ function main() {
     camera.setLook(inp?.look?.x ?? 0, inp?.look?.y ?? 0);
 
     // edge actions from both sources
-    const actions = [...keyboard.drainActions(), ...gamepad.drainActions()];
+    // Drain both queues so actions from an inactive device cannot fire later
+    // when the user switches inputs.
+    const keyboardActions = keyboard.drainActions();
+    const gamepadActions = gamepad.drainActions();
+    const actions = inputSelect.value === 'keyboard' ? keyboardActions : gamepadActions;
     for (const a of actions) {
       if (a === 'flaps') state.flapDetent = (state.flapDetent + 1) % FLAP_DEG.length;
       else if (a === 'flapsUp') state.flapDetent = Math.max(0, state.flapDetent - 1);
@@ -98,12 +119,31 @@ function main() {
     // ---- render ----
     camera.update(rs, dt);
     scene.render(camera, rs, ctrl, propAngle);
-    hud.draw(rs.full, ctrl, { gamepad: usingPad, paused }, dt);
+    hud.draw(rs.full, ctrl, {
+      gamepad: usingPad,
+      inputName: usingPad ? gamepad.id : 'Keyboard',
+      paused,
+    }, dt);
     audio.update(state, dt);
 
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+}
+
+function updateInputOptions(select, devices) {
+  const selected = select.value;
+  select.replaceChildren(new Option('Keyboard', 'keyboard'));
+  if (devices.length === 0) {
+    const hint = new Option('No gamepad - press a button, then Refresh', 'no-gamepad');
+    hint.disabled = true;
+    select.add(hint);
+  }
+  for (const device of devices) {
+    select.add(new Option(device.id || `Gamepad ${device.index + 1}`, String(device.index)));
+  }
+  const stillAvailable = [...select.options].some((option) => option.value === selected);
+  select.value = stillAvailable ? selected : 'keyboard';
 }
 
 // accumulate keyboard/gamepad contributions into the persistent controls object.

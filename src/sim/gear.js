@@ -56,7 +56,8 @@ export function gearForces(s, ctrl, groundHeight) {
     if (vec3.len(rollDir) < 1e-4) rollDir = [1, 0, 0];
     rollDir = vec3.normalize(rollDir);
     if (g.steer) {
-      const steerAng = clamp(ctrl.steer, -1, 1) * g.maxSteer;
+      // Heading increases clockwise in ENU, opposite a +Z mathematical rotation.
+      const steerAng = -clamp(ctrl.steer, -1, 1) * g.maxSteer;
       const cs = Math.cos(steerAng), sn = Math.sin(steerAng);
       rollDir = [
         rollDir[0] * cs - rollDir[1] * sn,

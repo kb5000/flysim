@@ -5,6 +5,30 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #gl { z-index: 1; }
 #hud { z-index: 2; pointer-events: none; }
 
+#input-picker {
+  position: absolute; top: 14px; right: 18px; z-index: 4;
+  display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+  padding: 6px 8px; border: 1px solid rgba(150, 235, 180, 0.55);
+  background: rgba(4, 12, 16, 0.72); color: #b4ffc8;
+  font: 11px monospace; letter-spacing: 0.08em;
+}
+.input-row { display: flex; align-items: center; gap: 8px; }
+#input-device {
+  max-width: 260px; padding: 3px 6px;
+  border: 1px solid rgba(150, 235, 180, 0.45);
+  background: #101a1e; color: #e1ffea; font: 12px monospace;
+}
+#refresh-input {
+  padding: 3px 7px; border: 1px solid rgba(150, 235, 180, 0.45);
+  background: #183027; color: #d9ffe5; font: 11px monospace;
+  cursor: pointer;
+}
+#refresh-input:hover { background: #24503d; }
+#input-status {
+  max-width: 380px; color: #ffd990; font-size: 10px;
+  letter-spacing: 0; line-height: 1.3;
+}
+
 #boot {
   position: absolute; inset: 0; z-index: 3;
   display: flex; flex-direction: column; align-items: center; justify-content: center;

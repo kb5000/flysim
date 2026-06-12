@@ -24,9 +24,9 @@ export const C172 = {
   CLflap: [0.0, 0.35, 0.7],         // additional CL0 per flap detent (0/10/25 deg)
 
   // ---- drag ----
-  CD0: 0.027,
+  CD0: 0.025,
   CDflap: [0.0, 0.012, 0.045],      // additional parasite drag per flap detent
-  CDgear: 0.018,                    // fixed gear drag (always present on a 172)
+  CDgear: 0.012,                    // fixed gear drag (always present on a 172)
 
   // ---- side force ----
   CYb: -0.31,          // per rad
@@ -43,24 +43,24 @@ export const C172 = {
   Clp: -0.47,          // roll damping
   Clr: 0.096,          // roll due yaw rate
   Clda: 0.178,         // aileron power per rad
-  Cldr: 0.0147,
+  Cldr: 0.008,
 
   // ---- yaw moment ----
   Cnb: 0.065,          // weathercock stability per rad
   Cnr: -0.099,         // yaw damping
   Cnp: -0.03,          // yaw due roll rate
-  Cndr: -0.069,        // rudder power per rad
+  Cndr: 0.042,         // softened rudder authority for less abrupt yaw response
   Cnda: -0.053,        // adverse yaw from aileron per rad
 
   // ---- control surface deflection limits (rad) ----
   elevMax: 25 * Math.PI / 180,
   ailMax: 20 * Math.PI / 180,
-  rudMax: 25 * Math.PI / 180,
+  rudMax: 22 * Math.PI / 180,
   trimRange: 12 * Math.PI / 180,    // total elevator-equivalent trim authority
 
   // ---- propulsion ----
-  Tstatic: 2400,       // N static thrust at full throttle (~tuned for climb perf)
-  Vmax: 75,            // m/s airspeed at which thrust -> 0
+  Tstatic: 3000,       // N static thrust at full throttle
+  Vmax: 120,           // m/s extrapolated zero-thrust speed for prop efficiency
   thrustTau: 0.5,      // s spool-up time constant
   propTorqueFactor: 0.0008,  // slight yaw/roll from slipstream/torque
 

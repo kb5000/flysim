@@ -223,7 +223,7 @@ export class HUD {
     ctx.textAlign = 'right';
     const rx = this.w - 24;
     const stat = [
-      info.gamepad ? 'PAD: connected' : 'PAD: keyboard',
+      info.gamepad ? `PAD: ${shortName(info.inputName)}` : 'INPUT: keyboard',
       s.onGround ? `GND (${s.nWheelOnGround}/3)` : 'AIRBORNE',
       `AGL ${(s.agl * M_TO_FT).toFixed(0)} ft`,
     ];
@@ -282,7 +282,7 @@ export class HUD {
       ['LT / RT', 'Rudder left / right'],
       ['A / B (hold)', 'Throttle increase / decrease'],
       ['X (hold)', 'Brakes'],
-      ['RB + L-stick', 'Pitch trim (pull = nose up)'],
+      ['RB + R-stick', 'Pitch trim (pull = nose up)'],
       ['D-pad U/D', 'Flaps retract / extend'],
       ['D-pad L', 'Parking brake'],
       ['Y', 'Reset view   View: camera'],
@@ -299,4 +299,8 @@ export class HUD {
     }
     ctx.fillStyle = '#888'; ctx.fillText('Press H to close', 60, y + 16);
   }
+}
+
+function shortName(name) {
+  return name.length > 24 ? `${name.slice(0, 21)}...` : name;
 }

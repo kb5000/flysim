@@ -45,6 +45,22 @@ function colorForHeight(h, slope) {
   return [c[0] * shade, c[1] * shade, c[2] * shade];
 }
 
+export function terrainIndices(nx, ny) {
+  const indices = [];
+  const stride = nx + 1;
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const a = j * stride + i;
+      const b = a + 1;
+      const c = a + stride;
+      const d = c + 1;
+      // Counter-clockwise when viewed from above (+Z), matching gl.frontFace.
+      indices.push(a, b, c, b, d, c);
+    }
+  }
+  return indices;
+}
+
 export class Terrain {
   constructor(gl) {
     this.gl = gl;
@@ -54,17 +70,7 @@ export class Terrain {
     this.positions = new Float32Array(verts * 3);
     this.normals = new Float32Array(verts * 3);
     this.colors = new Float32Array(verts * 3);
-    const indices = [];
-    const stride = this.nx + 1;
-    for (let j = 0; j < this.ny; j++) {
-      for (let i = 0; i < this.nx; i++) {
-        const a = j * stride + i;
-        const b = a + 1;
-        const c = a + stride;
-        const d = c + 1;
-        indices.push(a, c, b, b, c, d);
-      }
-    }
+    const indices = terrainIndices(this.nx, this.ny);
     this.mesh = new Mesh(gl, {
       positions: this.positions,
       normals: this.normals,

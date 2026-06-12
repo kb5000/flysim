@@ -61,15 +61,21 @@ export class AircraftModel {
     this.elevator = new Mesh(gl, offset(plate(-0.25, 0, 0.5, 3.5, 0.08, ACCENT), 0, 0, 0));
     // ---- rudder, hinged about Z at tail ----
     this.rudderHinge = [-3.95, 0, -0.7];
-    this.rudder = new Mesh(gl, offset(boxGeometry(0.3, 0.05, 0.6, ACCENT), 0, 0, 0));
+    this.rudder = new Mesh(gl, offset(
+      boxGeometry(0.3, 0.05, 0.6, ACCENT),
+      -4.25, 0, -0.7
+    ));
     // ---- ailerons (outer wing trailing edge), left & right ----
     this.aileronHingeL = [-0.45, -3.3, -0.55];
     this.aileronHingeR = [-0.45, 3.3, -0.55];
-    this.aileronL = new Mesh(gl, offset(plate(-0.2, 0, 0.4, 2.4, 0.07, ACCENT), 0, 0, 0));
-    this.aileronR = new Mesh(gl, offset(plate(-0.2, 0, 0.4, 2.4, 0.07, ACCENT), 0, 0, 0));
+    this.aileronL = new Mesh(gl, offset(plate(-0.65, -3.3, 0.4, 2.4, 0.07, ACCENT), 0, 0, -0.55));
+    this.aileronR = new Mesh(gl, offset(plate(-0.65, 3.3, 0.4, 2.4, 0.07, ACCENT), 0, 0, -0.55));
     // ---- propeller disc/blades at nose ----
     this.propPos = [2.45, 0, -0.05];
-    const blade = offset(boxGeometry(0.04, 0.05, 0.9, PROP), 0, 0, 0);
+    const blade = offset(
+      boxGeometry(0.04, 0.05, 0.9, PROP),
+      this.propPos[0], this.propPos[1], this.propPos[2]
+    );
     this.prop = new Mesh(gl, blade);
     // spinner
     this.spinner = new Mesh(gl, offset(boxGeometry(0.12, 0.12, 0.12, [0.2, 0.2, 0.22]), 2.5, 0, -0.05));
@@ -90,10 +96,10 @@ export class AircraftModel {
     const dr = ctrl.rudder * (24 * Math.PI / 180);
     drawPart(this.rudder, hinge(this.rudderHinge, [0, 0, 1], dr));
 
-    // ailerons: right roll (aileron>0) => right aileron up, left aileron down
+    // +Y rotation moves an aft surface down. Right roll needs right up, left down.
     const da = ctrl.aileron * (20 * Math.PI / 180);
-    drawPart(this.aileronR, hinge(this.aileronHingeR, [0, 1, 0], da));
-    drawPart(this.aileronL, hinge(this.aileronHingeL, [0, 1, 0], -da));
+    drawPart(this.aileronR, hinge(this.aileronHingeR, [0, 1, 0], -da));
+    drawPart(this.aileronL, hinge(this.aileronHingeL, [0, 1, 0], da));
 
     // propeller: spin about X (nose axis); draw a few blades
     for (let i = 0; i < 3; i++) {

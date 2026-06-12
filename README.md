@@ -23,7 +23,7 @@ controls overlay.
 | LT / RT | Rudder left / right |
 | A (hold) / B (hold) | Throttle increase / decrease |
 | X (hold) | Brakes |
-| RB (hold) + left stick Y | Pitch trim (pull back = nose-up trim) |
+| RB (hold) + right stick Y | Pitch trim (pull back = nose-up trim) |
 | D-pad Up / Down | Flaps retract / extend one notch (0° / 10° / 25°) |
 | D-pad Left | Parking brake toggle |
 | Y | Reset camera view |
@@ -31,10 +31,16 @@ controls overlay.
 | Menu (Start) | Pause |
 | D-pad Right | Reset to runway (FlySim extra; unbound in MSFS) |
 
-Keyboard `[` / `]` also trims. While RB is held the left stick trims instead of
-deflecting the primary controls, matching MSFS's modifier behavior.
+Keyboard `[` / `]` also trims. While RB is held the right stick trims instead
+of moving the camera.
 
-Hot-pluggable; HUD shows connection status.
+Hot-pluggable. Use the input menu in the top-right corner to explicitly choose
+the keyboard or one of the connected gamepads; connecting a pad does not
+automatically take over the controls. Browsers may hide a gamepad until it has
+produced input, so press a button on the pad and use **Refresh** if it is not
+listed yet. Run the simulator as a top-level `http://localhost` page. Embedded
+preview frames may block the Gamepad API unless they explicitly grant the
+`gamepad` permission.
 
 ### Keyboard
 Arrows = pitch/roll (Down = pull up), A/D = rudder, W/S = throttle,
