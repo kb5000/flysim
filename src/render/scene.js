@@ -69,11 +69,19 @@ export class Scene {
       fog: [0.70, 0.78, 0.85],
     };
     this.fogDensity = 0.000035;
+    this.renderDistance = 6000;
 
     this._model = mat4.create();
     this._normal = new Float32Array(9);
     this._vp = mat4.create();
     this._invVP = mat4.create();
+  }
+
+  setRenderDistance(distance) {
+    this.renderDistance = distance;
+    this.terrain.setRenderDistance(distance);
+    this.runway.setRenderDistance(distance);
+    this.fogDensity = 0.35 / distance;
   }
 
   // s: interpolated render state; camera built externally.
@@ -82,7 +90,7 @@ export class Scene {
     resizeCanvas(gl);
     const w = gl.canvas.width, h = gl.canvas.height;
     gl.viewport(0, 0, w, h);
-    camera.setProjection(w / h);
+    camera.setProjection(w / h, 0.8, this.renderDistance * 2);
 
     // view-projection
     mat4.multiply(this._vp, camera.proj, camera.view);
@@ -94,7 +102,8 @@ export class Scene {
     this.sky.draw(this._invVP, camera.eye, this.sunDir, this.palette);
 
     // keep terrain window centered on aircraft
-    this.terrain.rebuild(s.pos[0], s.pos[1]);
+    this.terrain.updateStreaming(s.pos[0], s.pos[1]);
+    this.runway.rebuild(s.pos[0], s.pos[1]);
 
     gl.useProgram(this.prog.prog);
     const u = this.prog.uniforms;
@@ -106,7 +115,10 @@ export class Scene {
 
     // terrain & runway (identity model)
     this._setModel(mat4.identity(this._model));
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(1, 1);
     this.terrain.draw();
+    gl.disable(gl.POLYGON_OFFSET_FILL);
     this._setModel(mat4.identity(this._model));
     this.runway.draw();
 
@@ -122,7 +134,7 @@ export class Scene {
     // don't draw the aircraft in cockpit view (we're inside it)
     if (camera.mode !== 1) {
       const model = s.full?.aircraftType === 'quad' ? this.quad : this.aircraft;
-      model.draw(drawPart, ctrl, propAngle);
+      model.draw(drawPart, ctrl, propAngle, s.full?.flapDetent ?? 0);
     }
   }
 

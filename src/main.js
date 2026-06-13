@@ -31,12 +31,17 @@ function main() {
   const aircraftSelect = document.getElementById('aircraft-type');
   const inputSelect = document.getElementById('input-device');
   const refreshInput = document.getElementById('refresh-input');
+  const renderDistance = document.getElementById('render-distance');
   const inputStatus = document.getElementById('input-status');
   const gamepad = new Gamepad(
     (devices) => updateInputOptions(inputSelect, devices),
     (status) => { inputStatus.textContent = status; }
   );
   const audio = new AudioSys();
+  scene.setRenderDistance(Number(renderDistance.value));
+  renderDistance.addEventListener('change', () => {
+    scene.setRenderDistance(Number(renderDistance.value));
+  });
   inputSelect.addEventListener('change', () => {
     const value = inputSelect.value;
     gamepad.select(value === 'keyboard' ? null : Number(value));

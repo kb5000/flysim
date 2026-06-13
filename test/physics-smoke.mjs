@@ -185,5 +185,24 @@ const ground = () => 0;
     `r=${s.omega[2].toFixed(3)} rad/s`);
 })();
 
+// ---------------------------------------------------------------------------
+// Test 7: a yaw disturbance should damp instead of producing prolonged drift.
+// ---------------------------------------------------------------------------
+(function yawDamping() {
+  const s = createState();
+  s.pos = [0, 0, 500];
+  s.q = quat.fromHeadingPitchRoll(0, 0, 0);
+  s.vel = [0, 50, 0];
+  s.omega = [0, 0, 0.25];
+  s.onGround = false;
+  s.throttle = 0.6; s.thrustState = 0.6;
+  const ctrl = createControls();
+  ctrl.throttle = 0.6;
+  for (let k = 0; k < 2 / FIXED_DT; k++) stepPhysics(s, ctrl, FIXED_DT, ground);
+  check('yaw: disturbance damps promptly',
+    Math.abs(s.omega[2]) < 0.12,
+    `r=${s.omega[2].toFixed(3)} rad/s after 2s`);
+})();
+
 console.log(`\n${failures === 0 ? 'ALL TESTS PASSED' : failures + ' TEST(S) FAILED'}`);
 process.exit(failures === 0 ? 0 : 1);

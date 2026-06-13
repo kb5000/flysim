@@ -2,7 +2,7 @@
 // Builds a view matrix from the aircraft state each frame.
 // Right-stick look-around (MSFS-style): deflection pans the view, releasing
 // the stick recenters; resetView() snaps back instantly.
-import { mat4, vec3, quat, clamp } from '../math.js';
+import { mat4, vec3, quat } from '../math.js';
 
 export const CameraMode = { CHASE: 0, COCKPIT: 1, ORBIT: 2, COUNT: 3 };
 
@@ -31,12 +31,15 @@ export class Camera {
 
   resetView() { this.lookYaw = 0; this.lookPitch = 0; }
 
-  setProjection(aspect, near = 0.5, far = 60000) {
+  setProjection(aspect, near = 0.8, far = 12000) {
     mat4.perspective(this.proj, this.fov, aspect, near, far);
   }
 
   // s: aircraft state (interpolated pos/q). dt for smoothing.
   update(s, dt) {
+    // A slow render frame must not make the chase spring jump all the way to
+    // its target on the next frame. Physics still consumes the full frame dt.
+    const visualDt = Math.min(dt, 1 / 30);
     const pos = s.pos;
     const isQuad = s.full?.aircraftType === 'quad';
     const fwd = quat.rotate(s.q, [1, 0, 0]);   // nose in world
@@ -44,7 +47,7 @@ export class Camera {
     const right = quat.rotate(s.q, [0, 1, 0]);
 
     // smooth look offsets toward stick deflection; recenter on release
-    const k = clamp(dt * 8, 0, 1);
+    const k = 1 - Math.exp(-visualDt * 8);
     this.lookYaw += (this.lookInX * LOOK_YAW_MAX - this.lookYaw) * k;
     this.lookPitch += (this.lookInY * LOOK_PITCH_MAX - this.lookPitch) * k;
 
@@ -66,7 +69,7 @@ export class Camera {
 
     if (this.mode === CameraMode.ORBIT) {
       // slow auto-orbit; right stick steers angle and viewing height
-      this.orbitAngle += dt * (0.3 + this.lookInX * 2.0);
+      this.orbitAngle += visualDt * (0.3 + this.lookInX * 2.0);
       const r = 22, h = 6 + this.lookPitch * 14;
       const offset = [Math.cos(this.orbitAngle) * r, Math.sin(this.orbitAngle) * r, h];
       const eye = vec3.add(pos, offset);
@@ -92,11 +95,11 @@ export class Camera {
       pos[1] + behind[1] * distance,
       pos[2] + height + this.lookPitch * (isQuad ? 5 : 12),
     ];
-    this.smoothEye = vec3.lerp(this.smoothEye, desiredEye, clamp(dt * 6, 0, 1));
+    this.smoothEye = vec3.lerp(this.smoothEye, desiredEye, 1 - Math.exp(-visualDt * 6));
     this.smoothTarget = vec3.lerp(
       this.smoothTarget,
       vec3.addScaled(pos, fwd, isQuad ? 1 : 4),
-      clamp(dt * 8, 0, 1)
+      1 - Math.exp(-visualDt * 8)
     );
     mat4.lookAt(this.view, this.smoothEye, this.smoothTarget, [0, 0, 1]);
     this.eye = this.smoothEye;
