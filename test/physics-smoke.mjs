@@ -204,5 +204,34 @@ const ground = () => 0;
     `r=${s.omega[2].toFixed(3)} rad/s after 2s`);
 })();
 
+// ---------------------------------------------------------------------------
+// Test 8: landing gear follows an uphill terrain plane without tunneling.
+// ---------------------------------------------------------------------------
+(function uphillGroundHandling() {
+  const grade = 0.08;
+  const slopeGround = (_x, y) => grade * y;
+  const pitch = Math.atan(grade);
+  const s = createState();
+  s.q = quat.fromHeadingPitchRoll(0, pitch, 0);
+  s.pos = [0, 0, 0.85];
+  s.vel = [0, 0, 0];
+  s.omega = [0, 0, 0];
+  s.onGround = true;
+  s.throttle = 0;
+  s.thrustState = 0;
+  const ctrl = createControls();
+  ctrl.throttle = 0.55;
+
+  let maxBodyBurial = 0;
+  for (let k = 0; k < 5 / FIXED_DT; k++) {
+    stepPhysics(s, ctrl, FIXED_DT, slopeGround);
+    maxBodyBurial = Math.max(maxBodyBurial, slopeGround(s.pos[0], s.pos[1]) - s.pos[2]);
+  }
+  const expectedRise = slopeGround(s.pos[0], s.pos[1]);
+  check('ground: aircraft climbs a terrain slope without tunneling',
+    s.pos[1] > 3 && s.pos[2] > expectedRise + 0.45 && maxBodyBurial < 0.15 && !s.crashed,
+    `y=${s.pos[1].toFixed(1)}m z=${s.pos[2].toFixed(2)}m ground=${expectedRise.toFixed(2)}m`);
+})();
+
 console.log(`\n${failures === 0 ? 'ALL TESTS PASSED' : failures + ' TEST(S) FAILED'}`);
 process.exit(failures === 0 ? 0 : 1);
