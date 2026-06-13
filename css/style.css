@@ -13,12 +13,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   font: 11px monospace; letter-spacing: 0.08em;
 }
 .input-row { display: flex; align-items: center; gap: 8px; }
-#input-device, #aircraft-type {
+#input-device, #aircraft-type, #render-distance {
   max-width: 260px; padding: 3px 6px;
   border: 1px solid rgba(150, 235, 180, 0.45);
   background: #101a1e; color: #e1ffea; font: 12px monospace;
 }
 #aircraft-type { flex: 1; }
+#render-distance { flex: 1; }
 .guide-link {
   padding: 3px 7px; border: 1px solid rgba(110, 185, 255, 0.5);
   background: #14263a; color: #b9dcff; text-decoration: none;

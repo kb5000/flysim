@@ -52,6 +52,9 @@ rudder and throttle as roll rate, pitch rate, yaw rate and collective thrust.
 Keyboard `[` / `]` also trims. While RB is held the right stick trims instead
 of moving the camera.
 
+The **VIEW** selector changes the terrain render radius between 4, 6 and 8 km.
+Player world coordinates are shown above the minimap in the top-left corner.
+
 Hot-pluggable. Use the input menu in the top-right corner to explicitly choose
 the keyboard or one of the connected gamepads; connecting a pad does not
 automatically take over the controls. Browsers may hide a gamepad until it has
@@ -75,6 +78,9 @@ Arrows = pitch/roll (Down = pull up), A/D = rudder, W/S = throttle,
   ISA density vs. altitude, IAS vs. TAS.
 - Three-point landing gear (spring-damper + rolling/braking/lateral friction,
   steerable nosewheel); takeoff, landing, hard-touchdown crash detection.
+- Terrain chunks have a deterministic probability of generating an airstrip.
+  Streamed airstrips use the average surrounding elevation and blend smoothly
+  into the heightfield.
 - Class Cessna-172 parameters (see `src/sim/aircraft-c172.js`), lightly tuned
   for feel.
 

@@ -46,6 +46,15 @@ export class Mesh {
     }
     gl.bindVertexArray(null);
   }
+
+  destroy() {
+    const gl = this.gl;
+    gl.deleteBuffer(this.pBuf);
+    gl.deleteBuffer(this.nBuf);
+    gl.deleteBuffer(this.cBuf);
+    if (this.iBuf) gl.deleteBuffer(this.iBuf);
+    gl.deleteVertexArray(this.vao);
+  }
 }
 
 function makeAttrib(gl, loc, size, data, usage) {

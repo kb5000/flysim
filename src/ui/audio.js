@@ -16,16 +16,16 @@ export class AudioSys {
 
     // Engine: layered fundamentals with restrained high-frequency content.
     this.engGain = c.createGain(); this.engGain.gain.value = 0.0;
-    this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 550;
-    this.lp.Q.value = 0.7;
+    this.lp = c.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 480;
+    this.lp.Q.value = 0.5;
     this.highCut = c.createBiquadFilter(); this.highCut.type = 'highshelf';
-    this.highCut.frequency.value = 850; this.highCut.gain.value = -9;
-    this.osc1 = c.createOscillator(); this.osc1.type = 'sawtooth';
-    this.osc2 = c.createOscillator(); this.osc2.type = 'triangle';
+    this.highCut.frequency.value = 700; this.highCut.gain.value = -14;
+    this.osc1 = c.createOscillator(); this.osc1.type = 'triangle';
+    this.osc2 = c.createOscillator(); this.osc2.type = 'sine';
     this.subOsc = c.createOscillator(); this.subOsc.type = 'sine';
-    this.osc1Gain = c.createGain(); this.osc1Gain.gain.value = 0.42;
-    this.osc2Gain = c.createGain(); this.osc2Gain.gain.value = 0.34;
-    this.subGain = c.createGain(); this.subGain.gain.value = 0.5;
+    this.osc1Gain = c.createGain(); this.osc1Gain.gain.value = 0.34;
+    this.osc2Gain = c.createGain(); this.osc2Gain.gain.value = 0.25;
+    this.subGain = c.createGain(); this.subGain.gain.value = 0.58;
     this.osc1.frequency.value = 70; this.osc2.frequency.value = 105;
     this.subOsc.frequency.value = 35;
     this.osc1.connect(this.osc1Gain).connect(this.lp);
@@ -36,8 +36,8 @@ export class AudioSys {
 
     // stall beeper
     this.stallGain = c.createGain(); this.stallGain.gain.value = 0;
-    this.stallOsc = c.createOscillator(); this.stallOsc.type = 'square';
-    this.stallOsc.frequency.value = 800;
+    this.stallOsc = c.createOscillator(); this.stallOsc.type = 'sine';
+    this.stallOsc.frequency.value = 620;
     this.stallOsc.connect(this.stallGain); this.stallGain.connect(c.destination);
     this.stallOsc.start();
 
@@ -59,15 +59,15 @@ export class AudioSys {
     this.osc2.frequency.setTargetAtTime(base * 1.5, t, 0.05);
     this.subOsc.frequency.setTargetAtTime(base * 0.5, t, 0.05);
     this.lp.frequency.setTargetAtTime(
-      quad ? 650 + rpm * 1400 : 350 + rpm * 850,
+      quad ? 520 + rpm * 1050 : 300 + rpm * 620,
       t,
       0.08
     );
-    const vol = s.crashed ? 0 : (quad ? 0.15 * rpm : 0.07 + 0.14 * rpm);
-    this.engGain.gain.setTargetAtTime(vol, t, 0.08);
+    const vol = s.crashed ? 0 : (quad ? 0.12 * rpm : 0.055 + 0.12 * rpm);
+    this.engGain.gain.setTargetAtTime(vol, t, 0.12);
 
     // stall beep: pulse on/off
     const beepOn = s.aoaWarn && !s.crashed && (Math.floor(this._t * 4) % 2 === 0);
-    this.stallGain.gain.setTargetAtTime(beepOn ? 0.05 : 0, t, 0.01);
+    this.stallGain.gain.setTargetAtTime(beepOn ? 0.025 : 0, t, 0.04);
   }
 }

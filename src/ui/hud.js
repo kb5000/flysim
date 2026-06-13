@@ -4,8 +4,8 @@
 // crash/pause masks plus a help page.
 
 import { quat } from '../math.js';
-import { RUNWAY } from '../sim/state.js';
 import { groundHeight } from '../world/terrain.js';
+import { runwaysInRadius } from '../world/runway-layout.js';
 
 const MS_TO_KT = 1.94384;
 const M_TO_FT = 3.28084;
@@ -24,6 +24,7 @@ export class HUD {
     this.mapCanvas.width = MAP_GRID;
     this.mapCanvas.height = MAP_GRID;
     this.mapCenter = [Infinity, Infinity];
+    this.mapBuild = null;
     this.mapTrail = [];
     this.mapTrailTimer = 0;
     this.lastMapType = '';
@@ -215,14 +216,17 @@ export class HUD {
   }
 
   _minimap(s, heading, dt) {
-    const x = 18, y = 18, size = MAP_SIZE;
+    const x = 18, y = 78, size = MAP_SIZE;
     const snap = 500;
     const centerX = Math.round(s.pos[0] / snap) * snap;
     const centerY = Math.round(s.pos[1] / snap) * snap;
-    if (centerX !== this.mapCenter[0] || centerY !== this.mapCenter[1]) {
-      this.mapCenter = [centerX, centerY];
-      this._rebuildMap();
+    if (!this.mapBuild && (centerX !== this.mapCenter[0] || centerY !== this.mapCenter[1])) {
+      this._startMapBuild(centerX, centerY);
     }
+    this._advanceMapBuild(6);
+    const displayCenter = Number.isFinite(this.mapCenter[0])
+      ? this.mapCenter
+      : [centerX, centerY];
 
     if (s.aircraftType !== this.lastMapType) {
       this.mapTrail = [];
@@ -252,16 +256,19 @@ export class HUD {
     ctx.clip();
 
     const toMap = (wx, wy) => [
-      x + size * (0.5 + (wx - this.mapCenter[0]) / MAP_SPAN),
-      y + size * (0.5 - (wy - this.mapCenter[1]) / MAP_SPAN),
+      x + size * (0.5 + (wx - displayCenter[0]) / MAP_SPAN),
+      y + size * (0.5 - (wy - displayCenter[1]) / MAP_SPAN),
     ];
 
-    // Runway.
-    const [r0x, r0y] = toMap(RUNWAY.origin[0], RUNWAY.origin[1]);
-    const [r1x, r1y] = toMap(RUNWAY.origin[0], RUNWAY.origin[1] + RUNWAY.length);
     ctx.strokeStyle = 'rgba(235,235,225,0.9)';
-    ctx.lineWidth = Math.max(2, RUNWAY.width / MAP_SPAN * size);
-    ctx.beginPath(); ctx.moveTo(r0x, r0y); ctx.lineTo(r1x, r1y); ctx.stroke();
+    for (const runway of runwaysInRadius(displayCenter[0], displayCenter[1], MAP_SPAN * 0.75)) {
+      const endX = runway.origin[0] + Math.sin(runway.heading) * runway.length;
+      const endY = runway.origin[1] + Math.cos(runway.heading) * runway.length;
+      const [r0x, r0y] = toMap(runway.origin[0], runway.origin[1]);
+      const [r1x, r1y] = toMap(endX, endY);
+      ctx.lineWidth = Math.max(2, runway.width / MAP_SPAN * size);
+      ctx.beginPath(); ctx.moveTo(r0x, r0y); ctx.lineTo(r1x, r1y); ctx.stroke();
+    }
 
     // Recent ground track.
     if (this.mapTrail.length > 1) {
@@ -303,14 +310,24 @@ export class HUD {
     ctx.fillText('MAP  5 km', x + 4, y + size + 15);
   }
 
-  _rebuildMap() {
+  _startMapBuild(centerX, centerY) {
     const ctx = this.mapCanvas.getContext('2d');
-    const image = ctx.createImageData(MAP_GRID, MAP_GRID);
+    this.mapBuild = {
+      center: [centerX, centerY],
+      image: ctx.createImageData(MAP_GRID, MAP_GRID),
+      row: 0,
+    };
+  }
+
+  _advanceMapBuild(rowBudget) {
+    if (!this.mapBuild) return;
+    const { center, image } = this.mapBuild;
     const data = image.data;
-    for (let py = 0; py < MAP_GRID; py++) {
+    const endRow = Math.min(MAP_GRID, this.mapBuild.row + rowBudget);
+    for (let py = this.mapBuild.row; py < endRow; py++) {
       for (let px = 0; px < MAP_GRID; px++) {
-        const wx = this.mapCenter[0] + ((px + 0.5) / MAP_GRID - 0.5) * MAP_SPAN;
-        const wy = this.mapCenter[1] + (0.5 - (py + 0.5) / MAP_GRID) * MAP_SPAN;
+        const wx = center[0] + ((px + 0.5) / MAP_GRID - 0.5) * MAP_SPAN;
+        const wy = center[1] + (0.5 - (py + 0.5) / MAP_GRID) * MAP_SPAN;
         const h = groundHeight(wx, wy);
         const color = mapTerrainColor(h);
         const i = (py * MAP_GRID + px) * 4;
@@ -320,12 +337,26 @@ export class HUD {
         data[i + 3] = 235;
       }
     }
-    ctx.putImageData(image, 0, 0);
+    this.mapBuild.row = endRow;
+    if (endRow < MAP_GRID) return;
+    this.mapCanvas.getContext('2d').putImageData(image, 0, 0);
+    this.mapCenter = center;
+    this.mapBuild = null;
   }
 
   _readouts(s, ctrl, info) {
     const ctx = this.ctx;
     ctx.font = '12px monospace'; ctx.textAlign = 'left';
+    const coordLines = [
+      `X ${s.pos[0].toFixed(1)} m`,
+      `Y ${s.pos[1].toFixed(1)} m`,
+      `Z ${s.pos[2].toFixed(1)} m`,
+    ];
+    ctx.fillStyle = 'rgba(0,0,0,0.48)';
+    ctx.fillRect(14, 14, 150, 58);
+    ctx.fillStyle = 'rgba(180,255,200,0.95)';
+    coordLines.forEach((line, i) => ctx.fillText(line, 20, 29 + i * 16));
+
     const lines = s.aircraftType === 'quad'
       ? [
           'MODEL QUAD',

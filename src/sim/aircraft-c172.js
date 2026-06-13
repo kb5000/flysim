@@ -12,9 +12,9 @@ export const C172 = {
   e: 0.75,             // Oswald efficiency
 
   // inertia (kg m^2), diagonal tensor
-  Ixx: 1285,
+  Ixx: 1160,
   Iyy: 1825,
-  Izz: 2667,
+  Izz: 2380,
 
   // ---- lift ----
   CL0: 0.31,
@@ -24,12 +24,12 @@ export const C172 = {
   CLflap: [0.0, 0.35, 0.7],         // additional CL0 per flap detent (0/10/25 deg)
 
   // ---- drag ----
-  CD0: 0.025,
+  CD0: 0.030,
   CDflap: [0.0, 0.012, 0.045],      // additional parasite drag per flap detent
-  CDgear: 0.012,                    // fixed gear drag (always present on a 172)
+  CDgear: 0.014,                    // fixed gear drag (always present on a 172)
 
   // ---- side force ----
-  CYb: -0.31,          // per rad
+  CYb: -0.45,          // stronger sideslip damping for less lateral wandering
 
   // ---- pitch moment ----
   Cm0: 0.04,
@@ -40,14 +40,14 @@ export const C172 = {
 
   // ---- roll moment ----
   Clb: -0.089,         // dihedral effect per rad
-  Clp: -0.47,          // roll damping
+  Clp: -0.58,          // roll damping
   Clr: 0.096,          // roll due yaw rate
-  Clda: 0.178,         // aileron power per rad
+  Clda: 0.19,          // aileron power per rad
   Cldr: 0.008,
 
   // ---- yaw moment ----
-  Cnb: 0.065,          // weathercock stability per rad
-  Cnr: -0.099,         // yaw damping
+  Cnb: 0.085,          // weathercock stability per rad
+  Cnr: -0.18,          // yaw damping
   Cnp: -0.03,          // yaw due roll rate
   Cndr: 0.042,         // softened rudder authority for less abrupt yaw response
   Cnda: -0.053,        // adverse yaw from aileron per rad
@@ -59,13 +59,13 @@ export const C172 = {
   trimRange: 12 * Math.PI / 180,    // total elevator-equivalent trim authority
 
   // ---- propulsion ----
-  Tstatic: 3000,       // N static thrust at full throttle
-  Vmax: 120,           // m/s extrapolated zero-thrust speed for prop efficiency
-  thrustTau: 0.5,      // s spool-up time constant
+  Tstatic: 3400,       // N static thrust at full throttle
+  Vmax: 130,           // m/s extrapolated zero-thrust speed for prop efficiency
+  thrustTau: 0.38,     // s spool-up time constant
   propTorqueFactor: 0.0008,  // slight yaw/roll from slipstream/torque
 
-  // ---- landing gear (3-point), positions in body frame (m) ----
-  // nose gear forward, mains aft, all below CG (+Z down)
+  // ---- landing gear (3-point), tire contact points in body frame (m) ----
+  // Nose gear forward, mains aft, all below CG (+Z down).
   gear: [
     { name: 'nose', pos: [1.1, 0.0, 0.85], k: 38000, c: 6500, steer: true, brake: false, maxSteer: 30 * Math.PI / 180 },
     { name: 'left', pos: [-0.4, -1.3, 0.85], k: 55000, c: 9000, steer: false, brake: true, maxSteer: 0 },
