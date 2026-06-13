@@ -13,6 +13,16 @@ python3 -m http.server 8000
 Any static file server works. Click or press a key to start; press **H** for the
 controls overlay.
 
+## GitHub Pages deployment
+
+In the repository, open **Settings → Pages** and configure:
+
+- **Source:** Deploy from a branch
+- **Branch:** `main`
+- **Folder:** `/root`
+
+The project site will be available at <https://kb5000.github.io/flysim/>.
+
 Open `guide.html` for the complete textbook-style implementation guide,
 including architecture, equations, build steps, tests, and a file-by-file
 reference.
